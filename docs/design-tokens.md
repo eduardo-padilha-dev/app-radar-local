@@ -1,8 +1,8 @@
 # 🎨 Tokens de Design
 
 **Projeto:** Radar Local
-**Versão:** 1.0.0 · tokens aprovados na entrevista, aguardando leitura integral e commit do aluno
-**Última atualização:** 2026-10-21
+**Versão:** 1.2.0 · protótipo ajustado; revisão do aluno e acesso público pendentes
+**Última atualização:** 2026-10-27
 
 > Referência visual definida com o aluno no `/utf-design`. O objetivo é manter
 > consistência entre as telas, sem construir um design system completo.
@@ -74,24 +74,97 @@ a confirmação efetiva do pagamento continua seguindo a jornada e o PRD.
 
 ## Protótipo
 
-**Link:** pendente — o aluno informou que ainda não possui protótipo.
+**Ferramenta:** Figma Design. O aluno gerou este arquivo a partir do prompt
+baseado no PRD e nos tokens existentes. Depois de uma análise somente leitura,
+autorizou os ajustes de navegação, consistência e escopo em 27/10/2026.
 
-**Telas:** pendentes. O protótipo deverá reunir de 3 a 5 telas relacionadas à
-[jornada de contratação e renovação do plano](user-flows.md), conforme a atividade.
+**Arquivo editável:** [Radar Local](https://www.figma.com/design/1CkMDJeQzb7jj7eLUlTgII/Radar-Local).
 
-Sugestão para a criação futura, ainda sem telas produzidas ou aprovadas:
+**Apresentação — desktop:** [Percorrer o protótipo](https://www.figma.com/proto/1CkMDJeQzb7jj7eLUlTgII/Radar-Local?node-id=3-21788&starting-point-node-id=3%3A21788).
 
-1. Contratação ou renovação do plano.
-2. Retorno do pagamento com situação “Processando pagamento”.
-3. Consulta do pedido com pagamento confirmado e validade do plano.
-4. Pedido ainda não confirmado, com orientação para procurar suporte.
+**Apresentação — celular:** [Percorrer a versão móvel](https://www.figma.com/proto/1CkMDJeQzb7jj7eLUlTgII/Radar-Local?node-id=3-21822&starting-point-node-id=3%3A21822).
 
-Preço e limites do plano permanecem pendentes no [PRD](prd.md); o protótipo não
-deve apresentar valores ou promessas de uso ainda não decididos.
+**Cenários auxiliares:** [Erros, permissões e resultados simulados](https://www.figma.com/proto/1CkMDJeQzb7jj7eLUlTgII/Radar-Local?node-id=12-553&starting-point-node-id=12%3A553).
+
+**Acesso público:** ainda não confirmado. Configurar o compartilhamento para
+“Anyone with the link — can view” e testar a apresentação em janela anônima.
+O acesso autenticado pela integração não comprova acesso público.
+
+### Telas e cobertura das cinco áreas principais
+
+| Área | Telas | Histórias do PRD |
+| --- | --- | --- |
+| Acesso | Entrar, criar conta e confirmar e-mail | US01, US02, US03 |
+| Prospecção | Busca/resultados e histórico privado | US04, US05, US07 |
+| Acompanhamentos | Lista, edição contextual e seleção de status | US06 |
+| Meu plano | Contratação/renovação, pagamento externo fictício e consulta do pedido | US08 |
+| Administração | Usuários, dados cadastrais e consulta dos pedidos | US09, US10 |
+
+A área Conta apresenta dados somente para consulta e permite sair. O campo
+Anotações foi retirado dos acompanhamentos por não estar previsto no PRD.
+Nenhuma história foi promovida de Draft nem implementada por este trabalho.
+
+Menu lateral, busca horizontal e tabelas compactas organizam o desktop.
+No celular, os resultados usam cartões e o menu recolhido tem destinos
+clicáveis próprios para essa largura. Os frames auxiliares representam estados
+ou etapas dessas áreas, sem acrescentar funcionalidades ao escopo.
+
+### Jornadas e estados
+
+- Cadastro → carregamento → confirmação de e-mail → abertura simulada do link
+  recebido → entrada → demonstração. Há estados de validação, e-mail duplicado,
+  credenciais inválidas, conta desativada e link expirado/inválido.
+- Busca → resultados → acompanhar → escolher status → salvar. Os cinco status
+  do PRD têm representações de edição; projeto aceito/finalizado permite alternar
+  o campo entre valor fictício e não informado.
+- Busca inicial não marca Somente inéditos nem exibe os estabelecimentos sem
+  interesse. Filtros têm variações próprias, incluindo a combinação de inéditos
+  e não contatados. A marcação de desinteresse tem retorno e opção de desfazer.
+- Demonstração disponível/consumida, busca vazia, falha de consulta, campos de
+  busca obrigatórios, lista de acompanhamentos vazia e plano vencido possuem
+  estados acessíveis pela central de cenários.
+- Plano → preparação do pedido → pagamento externo fictício → retorno pendente.
+  Os controles de simulação de confirmação, recusa e ausência de confirmação
+  ficam separados das ações normais. Retornar não confirma o pagamento.
+- Saída/expiração da sessão → nova entrada → consulta do pedido preservado.
+  Contratação inicial e renovação têm contextos de retorno próprios.
+- Administração → criar/consultar/editar usuário ou confirmar desativação e
+  reativação; pedidos têm consultas por situação. Não há ação de liberação
+  manual de acesso pago nem acesso à prospecção privada.
+
+### Tokens e componentes
+
+As cores adicionais geradas pelo Figma foram substituídas pelas cores aprovadas.
+Textos de 14 px com peso 600 foram normalizados para a legenda de peso 400,
+sem criar outro papel tipográfico. A escala em rem desta referência permanece
+válida; o canvas do Figma exibe as equivalências em px considerando 1rem = 16px.
+
+Os cinco estados do botão continuam representados. Há etapas de carregamento
+que bloqueiam o reenvio da ação principal e avançam automaticamente na simulação.
+Foco por teclado é uma referência visual; navegação real por teclado ainda
+precisa de verificação na implementação.
+
+### Limites e validação
+
+O protótipo usa dados e entradas predeterminados, sem cadastro ou cobrança real.
+As transições representam comportamentos, não uma aplicação com persistência
+ou controle de acesso de produção. Os cenários permitem simular os desvios sem
+misturá-los às decisões de negócio.
+
+A verificação pela integração confere destinos, pontos iniciais, caminhos entre
+estados e capturas visuais. Ela não substitui percorrer a apresentação em janela
+anônima, conferir o comportamento da ferramenta de apresentação e revisar o
+resultado com o aluno.
+
+Preço, limites de uso, canal de suporte e condição de expiração permanecem
+pendentes no [PRD](prd.md) e na [jornada](user-flows.md). Não foram inventados
+valores, prazos ou promessas para preencher essas decisões.
 
 ## Pendências
 
 | Pendência | Próximo passo |
 | --- | --- |
-| Criar e revisar o protótipo com 3 a 5 telas da jornada | Aluno escolhe a ferramenta e aprova as telas; registrar o link real quando existir |
-| Validar os tokens nas telas | Conferir legibilidade, organização e estados dos botões ao revisar o protótipo |
+| Acesso público e navegação na apresentação | Aluno configura compartilhamento e percorre as jornadas em janela anônima |
+| Revisão final do protótipo | Aluno confere o resultado dos ajustes, inclusive estados auxiliares |
+| Achado da prototipagem | Aluno identifica o que descobriu ao percorrer a jornada para escrever a própria explicação do PR |
+| Commit e Pull Request | Aluno lê, commita e abre PR de manutenção; mesclar após o check e as validações da atividade |

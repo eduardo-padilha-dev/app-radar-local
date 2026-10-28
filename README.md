@@ -14,9 +14,10 @@ A negociação acontece fora da plataforma.
 O produto prevê uma demonstração limitada e um plano de acesso por 30 dias,
 com renovação manual. Preço e limites do plano ainda estão em definição.
 
-**Etapa atual:** definição do produto e de sua referência visual — Atividade 04.
+**Etapa atual:** prototipagem e revisão da referência visual — Atividade 06.
 As funcionalidades estão especificadas; a aplicação ainda não foi implementada.
-O protótipo visual está pendente.
+O protótipo foi criado no Figma; a revisão visual e a validação do acesso público
+estão pendentes. O link e as telas estão em `docs/design-tokens.md`.
 
 ## Autores
 
@@ -26,7 +27,7 @@ O protótipo visual está pendente.
 
 - [PRD — problema, escopo, histórias e regras de negócio](docs/prd.md)
 - [Jornada de contratação e renovação do plano](docs/user-flows.md)
-- [Tokens de design e pendência do protótipo](docs/design-tokens.md)
+- [Tokens de design, telas e link do protótipo](docs/design-tokens.md)
 - [Ficha da disciplina — indicadores e entregas](docs/checklist.md)
 - [Arquitetura — modelo a preencher na próxima atividade](docs/architecture.md)
 
