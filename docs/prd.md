@@ -1,8 +1,8 @@
 # 📄 Product Requirements Document (PRD)
 
 **Projeto:** Radar Local
-**Versão:** 1.0.0 · entrevista concluída, aguardando leitura integral e commit do aluno
-**Última atualização:** 2026-10-21
+**Versão:** 1.1.0 · fonte de estabelecimentos aprovada na entrevista de arquitetura
+**Última atualização:** 2026-10-29
 
 > Fonte da verdade sobre o que o produto faz. As decisões foram tomadas pelo
 > aluno durante o `/utf-prd`; tecnologia será definida no `architecture.md`.
@@ -36,7 +36,7 @@ o encerramento.
 | :---- | :-------- | :---------------- |
 | Desenvolvedor | Freelancer que usa e paga pelo Radar Local. | Administrador ou estabelecimento prospectado. |
 | Administrador | Responsável pela plataforma, inicialmente o aluno. | Pessoa autorizada a consultar a prospecção privada dos desenvolvedores. |
-| Estabelecimento | Negócio listado no Google Maps e encontrado na região pesquisada. | Usuário ou cliente pagante do Radar Local. |
+| Estabelecimento | Negócio encontrado na região pesquisada por meio da Geoapify, cuja fonte principal é o OpenStreetMap. | Usuário ou cliente pagante do Radar Local. |
 | Possível cliente | Estabelecimento sem site próprio identificado nos dados consultados; pode ter redes sociais ou WhatsApp. | Garantia de inexistência de um site ou de contratação do freelancer. |
 | Busca | Consulta por cidade e estado, com ramo de atividade opcional. | Contato com o estabelecimento. |
 | Histórico de resultados | Registro privado dos estabelecimentos já apresentados nas buscas do desenvolvedor. | Lista escolhida para acompanhamento. |
@@ -126,6 +126,13 @@ clientes sem site próprio identificado.
 Telefone só será identificado como WhatsApp quando essa informação estiver
 disponível. Permissão de busca depende da demonstração ou de plano válido.
 Limites e regras de consumo pendentes estão no §9.
+
+A fonte escolhida é a Geoapify. Na amostra fornecida pelo aluno para
+Guarapuava–PR, houve 20 resultados com nome e endereço, dez com telefone e
+dois com campo de site (um Instagram e um site próprio). A amostra comprova
+retorno local, sem comprovar cobertura completa, atualização ou inexistência
+de site nos demais estabelecimentos. O link para o Google Maps permanece
+como destino de navegação, sem tornar o Google a fonte dos dados.
 
 **Regras relacionadas:** RN02, RN04, RN05, RN06, RN12, RN14.
 
@@ -298,6 +305,7 @@ entregue por este PRD.
 | Data | Versão | O que mudou |
 | :--- | :----- | :---------- |
 | 2026-10-21 | 1.0.0 | Entrevista via `/utf-prd`: visão, glossário, atores, dez histórias Draft, regras, cortes e requisitos de qualidade aprovados na conversa; aguardando leitura integral e commit do aluno. |
+| 2026-10-29 | 1.1.0 | Aluno aprovou Geoapify como fonte após avaliar uma amostra de Guarapuava–PR; ajustada a definição de estabelecimento, preservando a classificação de site não identificado e as pendências de preço e limites. |
 
 ## ❓ 9. Dúvidas em aberto
 
@@ -306,7 +314,7 @@ de promover as histórias afetadas a `🟡 Ready`.
 
 | # | Dúvida | Onde resolver / histórias afetadas |
 | :-- | :----- | :-------------------------------- |
-| 1 | Qual fonte ou serviço permitirá encontrar estabelecimentos e identificar seus links? Qual o custo e quais as condições de consulta e armazenamento do histórico? | Avaliação de viabilidade e custos antes de fechar a arquitetura; US04, US05 e US07. |
+| 1 | Fonte decidida: Geoapify, com armazenamento dos resultados permitido e atribuição à fonte obrigatória. Ainda é necessário dimensionar o consumo das buscas e dos detalhes para definir custos e limites do produto. Referências: [armazenamento e atribuição](https://www.geoapify.com/places-api/), [consumo em créditos](https://apidocs.geoapify.com/docs/places/). | Fonte aprovada pelo aluno na arquitetura; dimensionamento pendente para US04, US05 e US07. |
 | 2 | Qual será o preço do único plano de 30 dias? | Decisão do aluno após avaliar custos; US08 e US10. |
 | 3 | Quais serão os limites do plano pago, a unidade de consumo, o período de contagem e o comportamento ao atingir a cota? O uso será limitado. | Decisão de negócio após avaliar custos; US04 e US08. |
 | 4 | Uma busca sem resultados inéditos consumirá cota? Como filtros e falhas afetam o consumo? A regra fechada da demonstração permanece: busca sem resultados não a consome. | Decisão de negócio após avaliar custos; US04, US05, US07 e US08. |
