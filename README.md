@@ -29,11 +29,14 @@ estão pendentes. O link e as telas estão em `docs/design-tokens.md`.
 - [Jornada de contratação e renovação do plano](docs/user-flows.md)
 - [Tokens de design, telas e link do protótipo](docs/design-tokens.md)
 - [Ficha da disciplina — indicadores e entregas](docs/checklist.md)
-- [Arquitetura — modelo a preencher na próxima atividade](docs/architecture.md)
+- [Arquitetura — stack, estrutura e modelo de dados](docs/architecture.md)
 
 ## Stack
 
-<!-- Preencher na Atividade 05, após as decisões de arquitetura. -->
+- NestJS
+- Prisma
+- PostgreSQL
+- Vue
 
 ## Em produção
 
