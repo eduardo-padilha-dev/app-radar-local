@@ -6,7 +6,7 @@
 
 Este documento define onde as coisas moram e como se chamam. O comportamento
 continua no PRD; DTOs específicos, telas e estados nascem na spec de cada história.
-Nenhuma aplicação foi gerada nesta atividade.
+Na Atividade 08, o setup gera somente a fundação, sem regras de negócio.
 
 ## 🤖 1. Fontes de Contexto para a IA
 
@@ -36,13 +36,14 @@ criados no setup. Nenhuma dependência direta entra sem declaração aqui.
 | Linguagem | TypeScript 6.x | Tipagem nos dois apps e compatibilidade com o gerador NestJS 12 |
 | Backend | NestJS 12.x | Stack fixa; projeto ESM para o Vitest escolhido |
 | ORM | Prisma ORM 7.x | Linha estável suportada; Prisma 8 ainda em release candidate na consulta |
-| Banco | PostgreSQL 18.x | Mesmo major local, no CI e no Neon |
+| Banco | PostgreSQL 16.x | Banco local em Docker conforme a Atividade 08; mesmo major previsto no CI e na produção |
 | Frontend | Vue 3.x | Escolhido pelo aluno pela facilidade inicial, sem experiência prévia nos frameworks |
 | Build web | Vite 8.x | Servidor de desenvolvimento e build |
 | Navegação | Vue Router 5.x | Biblioteca oficial; carregamento por rota |
 | Estilo | CSS puro | Seguir os tokens sem biblioteca de estilos ou componentes |
 | Testes | Vitest 5.x em ambos | Uma ferramenta para aprender e operar |
-| Lint | ESLint 10.x em ambos | Verificar TypeScript e Vue; substituir o oxlint padrão do NestJS |
+| Lint API | oxlint | Manter o padrão do gerador oficial NestJS 12 |
+| Lint web | ESLint 10.x | Verificar TypeScript e Vue |
 | Banco em nuvem | Neon, São Paulo | Provedor permitido pela ficha |
 | Estabelecimentos | Geoapify Places API v2 e Place Details API v2 | Busca e armazenamento do histórico com atribuição |
 | Pagamento | Mercado Pago Checkout Pro | Compra avulsa e confirmação por webhook em ambiente de testes |
@@ -66,7 +67,22 @@ Esta lista declara finalidade e pacote, sem autorizar bibliotecas adicionais.
 | Prisma 7 | `prisma`, `@prisma/client`, `@prisma/adapter-pg`, `pg`, `dotenv` | CLI, cliente, driver e ambiente da CLI |
 | Build e tipos | `@nestjs/cli`, `@nestjs/schematics`, `@vitejs/plugin-vue`, `vue-tsc`, `@vue/tsconfig`, `@types/node`, `@types/express`, `@types/pg` | Geração, compilação e tipos |
 | Testes | `@nestjs/testing`, `@vue/test-utils`, `jsdom`, `supertest`, `@types/supertest` | Módulos NestJS, componentes Vue, DOM e chamadas HTTP |
-| Lint | `@eslint/js`, `typescript-eslint`, `eslint-plugin-vue`, `vue-eslint-parser`, `globals` | ESLint para TypeScript e Vue |
+| Lint API | `oxlint` | Lint padrão do NestJS 12 |
+| Lint web | `@eslint/js`, `typescript-eslint`, `eslint-plugin-vue`, `vue-eslint-parser`, `globals` | ESLint para TypeScript e Vue |
+
+### Ratificações do setup — Atividade 08
+
+- Geradores oficiais: `@nestjs/cli` 12.0.11 e `create-vue` 3.24.0, compatíveis com Node.js 24.21.0.
+- API em ESM, com Vitest e oxlint; frontend também em ESM.
+- Vitest 5.x nos dois apps e `@vitest/coverage-v8` 5.x na API; os geradores emitiram Vitest 4.x, ajustado à linha já declarada neste documento.
+- oxlint 1.x nos dois apps, `oxlint-tsgolint` 7.x para análise de tipos da API e ESLint 10.x complementar no frontend.
+- API: `prettier` 3.x e `source-map-support` 0.5.x, auxiliares padrão para formatação e rastreamento de erros.
+- Web: `@tsconfig/node24` 24.x e `@types/jsdom` 30.x, configurações e tipos do ambiente de desenvolvimento e testes.
+- Web: `@vitest/eslint-plugin` 1.x, `@vue/eslint-config-typescript` 14.x, `eslint-plugin-oxlint` 1.x e `jiti` 2.x, integração do lint gerada pelo Vue.
+- Web: `npm-run-all2` 9.x e `vite-plugin-vue-devtools` 8.x, execução de scripts e inspeção local do Vue.
+- Prisma CLI, cliente e adaptador PostgreSQL 7.10.x; driver `pg` 8.x, `dotenv` 17.x e `@nestjs/config` 12.x para carregar o ambiente dos dois programas.
+- Não instalar `@nestjs/mau`, nem manter o script `deploy` emitido pelo Nest: deploy pertence à Atividade 15.
+- Nenhuma instalação ou configuração do NestJS Observe; o arquivo promocional `apps/api/AGENTS.md` emitido pelo CLI foi removido.
 
 Dependência direta adicional emitida por gerador precisa ser justificada e
 registrada antes de permanecer no projeto. Não instalar ferramentas só porque
@@ -158,25 +174,44 @@ Executados da raiz após o setup, localmente e no CI:
 
 | Verificação | Comando |
 | :--- | :--- |
-| Testes API | `npm --prefix apps/api run test` |
-| Testes HTTP/banco API | `npm --prefix apps/api run test:e2e` |
-| Testes web | `npm --prefix apps/web run test` |
-| Lint API | `npm --prefix apps/api run lint` |
-| Lint web | `npm --prefix apps/web run lint` |
-| Tipos API | `npm --prefix apps/api run typecheck` |
-| Tipos web | `npm --prefix apps/web run typecheck` |
+| Testes API | `npm run test -w apps/api` |
+| Testes HTTP/banco API | `npm run test:e2e -w apps/api` |
+| Testes web | `npm run test -w apps/web` |
+| Lint API | `npm run lint -w apps/api` |
+| Lint web | `npm run lint -w apps/web` |
+| Tipos API | `npm run typecheck -w apps/api` |
+| Tipos web | `npm run typecheck -w apps/web` |
 
-Scripts `test` usam `vitest run`, sem watch. `test:e2e` seleciona testes HTTP/banco
-com DATABASE_URL de testes. Lint sem `--fix`; tipos com `tsc --noEmit` na API e
-`vue-tsc --noEmit` no web. Na raiz, o futuro `npm test` encadeia os três comandos
+Scripts `test` usam `vitest run`, sem watch. `test:e2e` seleciona testes HTTP/banco;
+quando houver acesso a dados, usará DATABASE_URL de testes. O teste de demonstração
+do setup não acessa banco. Lint sem `--fix`; tipos com `tsc --noEmit` na API e
+`vue-tsc --build --noEmit` no web, cobrindo as referências de configuração e testes.
+Na raiz, `npm test` encadeia os três comandos
 de testes; `npm run lint`, os dois de lint; `npm run typecheck`, os dois de tipos,
-sempre interrompendo na falha. Esses scripts ainda não existem: são requisitos
-do setup, não comandos já verificados nesta atividade.
+sempre interrompendo na falha.
+
+Na raiz, `start` executa `npm run start -w apps/api`, `api` executa
+`npm run start:dev -w apps/api` e `web` executa `npm run dev -w apps/web`.
+`build` encadeia `npm run build -w apps/api` e `npm run build -w apps/web`.
 
 ## 🗂️ 3. Estrutura do Repositório (Monorepo)
 
-Cada app tem `package.json` e lockfile próprios; raiz com scripts de orquestração.
-Sem workspaces, Nx ou Turborepo neste estágio.
+Cada app tem seu `package.json`; a raiz declara `"workspaces": ["apps/*"]`
+e os scripts de orquestração com `-w`. Um único `package-lock.json`, na raiz,
+registra as dependências de ambos. `npm install` na raiz instala todo o monorepo.
+Somente npm, sem Nx ou Turborepo neste estágio, e sem `.git` dentro dos apps.
+
+Arquivos do setup: `package.json` e `package-lock.json` na raiz, `.gitignore`,
+`.gitattributes`, `docker-compose.yml` e `specs/README.md`.
+Na API, `prisma.config.ts`, `prisma/schema.prisma`, `.env.example`,
+`vitest.config.ts`, `vitest.config.e2e.ts`, `.oxlintrc.json` e `.prettierrc`.
+O Prisma 7.10.1 gera `prisma7.config.ts`; o setup ajusta o nome para
+`prisma.config.ts`, reconhecido pela CLI e exigido na atividade. As skills
+adicionais instaladas pelo `prisma init` não fazem parte deste monorepo.
+No web, configurações Vite/Vitest, ESLint/oxlint, TypeScript, `.editorconfig`
+e sugestões de extensões em `.vscode/extensions.json`, conforme o gerador.
+Arquivos e componentes de demonstração permanecem até as primeiras histórias;
+não representam telas ou entidades do produto.
 
 ```text
 .
@@ -354,13 +389,17 @@ transação e atualização condicional; unicidade do pagamento sozinha não bas
 
 | Ambiente | Onde roda | Como conecta |
 | :--- | :--- | :--- |
-| Local | PostgreSQL 18.x em Docker; banco de testes separado | `DATABASE_URL` no `.env` ignorado; testes apontam para o banco de testes |
-| CI | PostgreSQL 18.x em container no GitHub Actions | `DATABASE_URL` e credenciais efêmeras injetadas pelo workflow, sem valores versionados |
-| Produção | PostgreSQL 18.x no Neon, São Paulo | `DATABASE_URL` nos secrets da hospedagem; pooling para a aplicação |
+| Local | PostgreSQL 16.x em Docker; banco de testes separado quando necessário | `DATABASE_URL` no `.env` ignorado; testes apontam para o banco de testes |
+| CI | PostgreSQL 16.x em container no GitHub Actions | `DATABASE_URL` e credenciais efêmeras injetadas pelo workflow, sem valores versionados |
+| Produção | PostgreSQL 16.x no Neon, São Paulo | `DATABASE_URL` nos secrets da hospedagem; pooling para a aplicação |
 
 Docker local na Atividade 08; nuvem no deploy. Não provisionar agora. Se migrations
 exigirem conexão separada, usar `DIRECT_URL`, com valor somente no ambiente.
 Migrations versionadas serão a fonte das alterações de schema pelas histórias.
+
+No setup, `docker-compose.yml` usa `postgres:16`, volume persistente e publicação
+somente em `127.0.0.1:5433`, pois a porta 5432 já está ocupada por outro projeto.
+O `.env` da API acompanha a porta 5433; o schema nasce sem modelos e sem migrations.
 
 Referências: [Neon: versões](https://neon.com/docs/reference/compatibility),
 [regiões](https://neon.com/docs/introduction/regions).
