@@ -71,10 +71,10 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Preparar a persistência do cadastro**
+- [x] **Tarefa 1 — Preparar a persistência do cadastro**
   - Cobre: CA1 e CA4 (passo técnico que destrava os fluxos completos das tarefas 2 e 5).
   - Teste primeiro: integração com o banco de testes prova criação atômica de usuário e emissão do token, unicidade do e-mail e rollback quando a emissão falha. Os testes falham inicialmente pela ausência dos modelos e do acesso ao banco. Provar que a configuração de testes rejeita o banco de desenvolvimento.
-  - Arquivos previstos: `apps/api/test/registration-persistence.e2e-spec.ts`, `apps/api/test/setup-database.ts`, `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/<timestamp>_create_registration/migration.sql`, `apps/api/src/database/prisma.module.ts`, `apps/api/src/database/prisma.service.ts`, `apps/api/vitest.config.e2e.ts`, `apps/api/.env.example`.
+  - Arquivos previstos: `apps/api/test/registration-persistence.e2e-spec.ts`, `apps/api/test/setup-database.ts`, `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/<timestamp>_create_registration/migration.sql`, `apps/api/prisma/migrations/migration_lock.toml`, `apps/api/src/database/prisma.module.ts`, `apps/api/src/database/prisma.service.ts`, `apps/api/vitest.config.e2e.ts`, `apps/api/.env.example`, `apps/api/tsconfig.build.json`, `apps/api/package.json`.
 
 - [ ] **Tarefa 2 — Concluir o cadastro com envio aceito**
   - Cobre: CA1.
