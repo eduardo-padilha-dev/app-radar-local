@@ -27,7 +27,14 @@ describe("registration page", () => {
     await router.isReady();
     const page = mount(App, { global: { plugins: [router] } });
     await flushPromises();
-    expect(page.find("form").exists()).toBe(true);
+    expect(page.findAll("form input").map((input) => input.attributes("name"))).toEqual([
+      "name",
+      "email",
+      "password",
+      "phone",
+    ]);
+    expect(page.get('label[for="phone"]').text()).toBe("Celular (opcional)");
+    expect(page.get("[name=phone]").attributes("required")).toBeUndefined();
     await page.get("[name=name]").setValue("Ana");
     await page.get("[name=email]").setValue("ana@example.com");
     await page.get("[name=password]").setValue("same password");

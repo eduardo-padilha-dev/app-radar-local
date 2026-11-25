@@ -19,12 +19,17 @@ export class AuthService {
 
   async register(input: RegisterDto): Promise<RegistrationResult> {
     const passwordHash = await this.passwords.hash(input.password);
+    const phone = input.phone
+      ?.trim()
+      .replace(/^\+55/, '')
+      .replace(/[\s()-]/g, '');
     const issuance = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           name: input.name,
           email: input.email,
           passwordHash,
+          phone: phone || null,
           role: 'DEVELOPER',
           isActive: true,
           emailVerifiedAt: null,

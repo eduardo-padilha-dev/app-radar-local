@@ -126,6 +126,34 @@ describe('public registration', () => {
     expect(first.passwordHash).not.toContain('same password');
   });
 
+  it.each([
+    { label: 'omitted', input: {}, expected: null },
+    { label: 'empty', input: { phone: '' }, expected: null },
+    {
+      label: 'national',
+      input: { phone: '42912345678' },
+      expected: '42912345678',
+    },
+    {
+      label: 'formatted with +55',
+      input: { phone: '+55 (42) 91234-5678' },
+      expected: '42912345678',
+    },
+  ])(
+    'creates an account with a phone that is $label',
+    async ({ input, expected }) => {
+      const email = 'ana@example.com';
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ name: 'Ana', email, password: 'same password', ...input })
+        .expect(201);
+
+      const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+      expect(user.phone).toBe(expected);
+      expect(send).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('rolls back both records and never sends email when token persistence fails', async () => {
     const original = await prisma.user.create({
       data: {
