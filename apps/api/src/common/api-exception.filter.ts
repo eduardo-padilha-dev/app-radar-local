@@ -3,8 +3,25 @@ import {
   Catch,
   HttpException,
   type ExceptionFilter,
+  type HttpExceptionOptions,
 } from '@nestjs/common';
 import type { Response } from 'express';
+
+type PublicApiError = {
+  code: string;
+  message: string;
+  details?: Record<string, string | number | boolean | null>;
+};
+
+export class PublicApiException extends HttpException {
+  constructor(
+    readonly publicError: PublicApiError,
+    status: number,
+    options?: HttpExceptionOptions,
+  ) {
+    super(publicError, status, options);
+  }
+}
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
@@ -12,6 +29,16 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const response = host.switchToHttp().getResponse<Response>();
     const statusCode =
       exception instanceof HttpException ? exception.getStatus() : 500;
+    if (exception instanceof PublicApiException) {
+      const { code, message, details } = exception.publicError;
+      response.status(statusCode).json({
+        statusCode,
+        code,
+        message,
+        details,
+      });
+      return;
+    }
     const body =
       exception instanceof HttpException ? exception.getResponse() : undefined;
     if (

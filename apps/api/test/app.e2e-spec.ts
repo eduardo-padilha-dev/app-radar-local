@@ -79,6 +79,34 @@ describe('AppController (e2e)', () => {
     });
   });
 
+  it('documents the unconfirmed verification email response', async () => {
+    const response = await request(app.getHttpServer()).get('/docs-json').expect(200);
+    const operation = response.body.paths['/auth/register'].post;
+    expect(operation.responses['502']).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            required: expect.arrayContaining(['statusCode', 'code', 'message', 'details']),
+            properties: {
+              statusCode: { type: 'integer', enum: [502] },
+              code: { type: 'string', enum: ['VERIFICATION_EMAIL_UNCONFIRMED'] },
+              message: { type: 'string' },
+              details: {
+                type: 'object',
+                required: expect.arrayContaining(['accountCreated', 'emailVerificationPending']),
+                properties: {
+                  accountCreated: { type: 'boolean', enum: [true] },
+                  emailVerificationPending: { type: 'boolean', enum: [true] },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it('uses the configured web origin for CORS', async () => {
     await request(app.getHttpServer())
       .options('/auth/register')

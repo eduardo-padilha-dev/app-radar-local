@@ -1,4 +1,6 @@
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { BadGatewayException } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
@@ -8,6 +10,7 @@ import { requireTestDatabaseUrl } from './setup-database.js';
 import { createHash, scryptSync } from 'node:crypto';
 import { ResendEmailService } from '../src/integrations/resend/resend-email.service.js';
 import { VerificationToken } from '../src/modules/auth/verification-token.js';
+import { VerificationEmailUnconfirmedException } from '../src/modules/auth/verification-email-unconfirmed.exception.js';
 import { configureApp } from '../src/common/configure-app.js';
 
 vi.hoisted(() => {
@@ -17,10 +20,23 @@ vi.hoisted(() => {
   process.env.CORS_ORIGIN = 'https://web.example';
 });
 
+it('provides the public registration error without the provider cause', () => {
+  const error = new VerificationEmailUnconfirmedException(
+    new Error('Sensitive provider details'),
+  );
+  expect(error.getResponse()).toEqual({
+    code: 'VERIFICATION_EMAIL_UNCONFIRMED',
+    message:
+      'Sua conta foi criada, mas não conseguimos confirmar o envio do e-mail de confirmação. Tente reenviar o link.',
+    details: { accountCreated: true, emailVerificationPending: true },
+  });
+});
+
 describe('public registration', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let tokens: VerificationToken;
+  let provider: ResendEmailService;
   const send = vi.fn<(to: string, link: string) => Promise<void>>();
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -34,6 +50,7 @@ describe('public registration', () => {
     await app.init();
     prisma = module.get(PrismaService);
     tokens = module.get(VerificationToken);
+    provider = new ResendEmailService(module.get(ConfigService));
   });
   beforeEach(async () => {
     requireTestDatabaseUrl(process.env.DATABASE_URL);
@@ -55,7 +72,10 @@ describe('public registration', () => {
       ]);
     });
   });
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
   afterAll(async () => {
     if (prisma) {
       requireTestDatabaseUrl(process.env.DATABASE_URL);
@@ -64,6 +84,68 @@ describe('public registration', () => {
     }
     await app?.close();
   });
+  it('sanitizes the response body of a generic bad gateway exception', async () => {
+    vi.spyOn(tokens, 'issue').mockImplementationOnce(() => {
+      throw new BadGatewayException({
+        code: 'PROVIDER_ERROR',
+        message: 'Sensitive provider details',
+        details: { sensitive: true },
+      });
+    });
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ name: 'Ana', email: 'ana@example.com', password: 'same password' })
+      .expect(502)
+      .expect({
+        statusCode: 502,
+        code: 'INTERNAL_ERROR',
+        message: 'Erro interno do servidor.',
+      });
+  });
+  it.each(['HTTP rejection', 'network failure', 'timeout'])(
+    'keeps one active account and unused token on provider %s',
+    async (failure) => {
+      const fetchMock = vi.fn<typeof fetch>();
+      if (failure === 'HTTP rejection') {
+        fetchMock.mockResolvedValueOnce(new Response('Sensitive provider details', { status: 403 }));
+      } else {
+        fetchMock.mockRejectedValueOnce(
+          failure === 'timeout'
+            ? new DOMException('Sensitive provider details', 'TimeoutError')
+            : new TypeError('Sensitive provider details'),
+        );
+      }
+      vi.stubGlobal('fetch', fetchMock);
+      send.mockImplementationOnce((to, link) => provider.sendVerificationEmail(to, link));
+      const response = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ name: 'Ana', email: 'ana@example.com', password: 'same password' });
+
+      expect(response.status).toBe(502);
+      expect(response.body).toEqual({
+        statusCode: 502,
+        code: 'VERIFICATION_EMAIL_UNCONFIRMED',
+        message:
+          'Sua conta foi criada, mas não conseguimos confirmar o envio do e-mail de confirmação. Tente reenviar o link.',
+        details: { accountCreated: true, emailVerificationPending: true },
+      });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const users = await prisma.user.findMany();
+      expect(users).toEqual([
+        expect.objectContaining({ email: 'ana@example.com', isActive: true, emailVerifiedAt: null }),
+      ]);
+      const token = new URL(send.mock.calls[0]![1]).searchParams.get('token')!;
+      expect(await prisma.emailVerification.findMany()).toEqual([
+        expect.objectContaining({
+          userId: users[0]!.id,
+          email: 'ana@example.com',
+          tokenHash: createHash('sha256').update(token).digest('hex'),
+          usedAt: null,
+        }),
+      ]);
+    },
+  );
   it('creates an active developer awaiting email confirmation without a session or paid access', async () => {
     const now = new Date('2026-11-10T15:30:00.123Z');
     vi.spyOn(Date, 'now').mockReturnValue(now.getTime());

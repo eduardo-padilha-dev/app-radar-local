@@ -34,3 +34,52 @@ it('sends the verification link through the provider REST API without exposing c
   });
   expect(options.signal).toBeInstanceOf(AbortSignal);
 });
+
+it('cancels a single pending request after exactly ten seconds', async () => {
+  vi.useFakeTimers();
+  try {
+    const send = vi.fn<typeof fetch>(
+      (_url, options) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = options?.signal;
+          signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+        }),
+    );
+    vi.stubGlobal('fetch', send);
+    const service = new ResendEmailService(new ConfigService({
+      RESEND_API_KEY: 'test-key',
+      EMAIL_FROM: 'hello@example.com',
+    }));
+    const result = service.sendVerificationEmail('ana@example.com', 'https://web.example/link');
+    const outcome = result.catch((error: unknown) => error);
+    const signal = send.mock.calls[0]?.[1]?.signal;
+    await vi.advanceTimersByTimeAsync(9999);
+    expect(signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(signal?.aborted).toBe(true);
+    expect(await outcome).toBeInstanceOf(Error);
+    expect(send).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it.each([200, 429])('cancels an unread provider response body with HTTP %i', async (status) => {
+  const cancel = vi.fn();
+  const body = new ReadableStream({ cancel });
+  const send = vi.fn<typeof fetch>().mockResolvedValue(new Response(body, { status }));
+  vi.stubGlobal('fetch', send);
+  const service = new ResendEmailService(new ConfigService({
+    RESEND_API_KEY: 'test-key',
+    EMAIL_FROM: 'hello@example.com',
+  }));
+
+  const result = service.sendVerificationEmail('ana@example.com', 'https://web.example/link');
+  if (status === 200) {
+    await expect(result).resolves.toBeUndefined();
+  } else {
+    await expect(result).rejects.toThrow('Verification email was not accepted');
+  }
+
+  expect(cancel).toHaveBeenCalledOnce();
+});

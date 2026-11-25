@@ -21,6 +21,10 @@ const { fields, errors, state, submit } = useRegistration();
         </p>
         <p class="guidance">Abra o link recebido para confirmar seu e-mail.</p>
       </template>
+      <!-- // TODO #3: conectar ao fluxo real de reenvio da confirmação. -->
+      <p v-else-if="state === 'email-unconfirmed'" class="error" role="alert">
+        Sua conta foi criada, mas não conseguimos confirmar o envio do e-mail de confirmação. Tente reenviar o link.
+      </p>
       <form v-else novalidate :aria-busy="state === 'submitting'" @submit.prevent="submit">
         <div class="fields">
           <label for="name"

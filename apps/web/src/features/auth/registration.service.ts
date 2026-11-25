@@ -26,6 +26,12 @@ export class EmailAlreadyRegisteredError extends Error {
   }
 }
 
+export class VerificationEmailUnconfirmedError extends Error {
+  constructor() {
+    super("Não conseguimos confirmar o envio do e-mail de confirmação.");
+  }
+}
+
 export async function register(input: RegistrationInput): Promise<RegistrationResult> {
   try {
     return await post<RegistrationResult>("/auth/register", input);
@@ -36,6 +42,13 @@ export async function register(input: RegistrationInput): Promise<RegistrationRe
       error.code === "EMAIL_ALREADY_REGISTERED"
     ) {
       throw new EmailAlreadyRegisteredError();
+    }
+    if (
+      error instanceof HttpError &&
+      error.statusCode === 502 &&
+      error.code === "VERIFICATION_EMAIL_UNCONFIRMED"
+    ) {
+      throw new VerificationEmailUnconfirmedError();
     }
     if (error instanceof HttpError && error.statusCode === 400 && error.code === "VALIDATION_ERROR") {
       const details = error.details;

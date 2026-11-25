@@ -10,6 +10,47 @@ afterEach(() => {
 });
 
 describe("registration page", () => {
+  it.each([
+    [502, "VERIFICATION_EMAIL_UNCONFIRMED", true],
+    [502, "INTERNAL_ERROR", false],
+    [500, "VERIFICATION_EMAIL_UNCONFIRMED", false],
+    [0, "NETWORK_ERROR", false],
+  ])("handles status %i and code %s without assuming delivery", async (status, code, created) => {
+    const fetchMock = vi.fn<typeof fetch>();
+    if (status === 0) {
+      fetchMock.mockRejectedValueOnce(new TypeError("Network request failed"));
+    } else {
+      fetchMock.mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          statusCode: status,
+          code,
+          details: { accountCreated: true, emailVerificationPending: true },
+        }),
+        { status },
+      ));
+    }
+    vi.stubGlobal("fetch", fetchMock);
+    const page = mount(RegisterPage);
+    try {
+      await page.get("#name").setValue("Ana");
+      await page.get("#email").setValue("ana@example.com");
+      await page.get("#password").setValue("same password");
+      await page.get("form").trigger("submit");
+      await flushPromises();
+
+      expect(page.get("[role=alert]").text()).toBe(
+        created
+          ? "Sua conta foi criada, mas não conseguimos confirmar o envio do e-mail de confirmação. Tente reenviar o link."
+          : "Não foi possível concluir a solicitação.",
+      );
+      expect(page.find("form").exists()).toBe(!created);
+      expect(page.findAll("a")).toHaveLength(0);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      page.unmount();
+    }
+  });
+
   it("shows the exact guidance for an email that is already registered", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(

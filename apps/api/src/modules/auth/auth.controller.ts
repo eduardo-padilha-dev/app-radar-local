@@ -1,5 +1,6 @@
 import { Body, Controller, Inject, Post } from '@nestjs/common';
 import {
+  ApiBadGatewayResponse,
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
@@ -62,6 +63,26 @@ export class AuthController {
         statusCode: { type: 'integer', enum: [409] },
         code: { type: 'string', enum: ['EMAIL_ALREADY_REGISTERED'] },
         message: { type: 'string' },
+      },
+    },
+  })
+  @ApiBadGatewayResponse({
+    description: 'Conta criada com e-mail pendente e envio não confirmado.',
+    schema: {
+      type: 'object',
+      required: ['statusCode', 'code', 'message', 'details'],
+      properties: {
+        statusCode: { type: 'integer', enum: [502] },
+        code: { type: 'string', enum: ['VERIFICATION_EMAIL_UNCONFIRMED'] },
+        message: { type: 'string' },
+        details: {
+          type: 'object',
+          required: ['accountCreated', 'emailVerificationPending'],
+          properties: {
+            accountCreated: { type: 'boolean', enum: [true] },
+            emailVerificationPending: { type: 'boolean', enum: [true] },
+          },
+        },
       },
     },
   })

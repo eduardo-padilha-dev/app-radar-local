@@ -4,6 +4,7 @@ import { Prisma } from '../../../generated/prisma/client.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { ResendEmailService } from '../../integrations/resend/resend-email.service.js';
 import { PasswordHasher } from './password-hasher.js';
+import { VerificationEmailUnconfirmedException } from './verification-email-unconfirmed.exception.js';
 import { VerificationToken } from './verification-token.js';
 import type { RegisterDto } from './dto/register.dto.js';
 import type { RegistrationResult } from './dto/registration-result.dto.js';
@@ -64,7 +65,11 @@ export class AuthService {
       this.config.getOrThrow<string>('WEB_URL'),
     );
     link.searchParams.set('token', issuance.token);
-    await this.email.sendVerificationEmail(issuance.email, link.toString());
+    try {
+      await this.email.sendVerificationEmail(issuance.email, link.toString());
+    } catch (cause) {
+      throw new VerificationEmailUnconfirmedException(cause);
+    }
     return { accountCreated: true, verificationEmailStatus: 'accepted' };
   }
 }

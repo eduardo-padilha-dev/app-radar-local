@@ -3,6 +3,7 @@ import {
   EmailAlreadyRegisteredError,
   register,
   RegistrationValidationError,
+  VerificationEmailUnconfirmedError,
   type RegistrationFieldErrors,
 } from "./registration.service";
 
@@ -13,7 +14,11 @@ export function useRegistration() {
     "idle" | "submitting" | "success" | "email-already-registered" | "email-unconfirmed" | "error"
   >("idle");
   async function submit() {
-    if (state.value === "submitting" || state.value === "success") return;
+    if (
+      state.value === "submitting" ||
+      state.value === "success" ||
+      state.value === "email-unconfirmed"
+    ) return;
     errors.value = {};
     state.value = "submitting";
     try {
@@ -32,6 +37,9 @@ export function useRegistration() {
         state.value = "idle";
       } else if (error instanceof EmailAlreadyRegisteredError) {
         state.value = "email-already-registered";
+      } else if (error instanceof VerificationEmailUnconfirmedError) {
+        fields.password = "";
+        state.value = "email-unconfirmed";
       } else {
         state.value = "error";
       }
