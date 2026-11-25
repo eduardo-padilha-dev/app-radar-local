@@ -198,6 +198,7 @@ possa utilizar as buscas e o acompanhamento do Radar Local.
 **Critérios de aceite:**
 
 - [ ] **Dado** que escolhi contratar o plano, **quando** iniciar o pagamento, **então** o sistema registrará um pedido com o preço definido pela plataforma.
+- [ ] **Dado** um pedido registrado, **quando** o desenvolvedor fechar a aba ou perder a conexão, **então** o pedido será preservado, o processamento continuará e ele poderá consultar a situação do pedido quando voltar com uma sessão válida.
 - [ ] **Dado** pagamento pendente, recusado ou abandonado, **quando** consultar o acesso contratado, **então** esse pedido não terá liberado acesso pago.
 - [ ] **Dado** confirmação válida do pagamento pelo serviço de cobrança, **quando** recebê-la, **então** o pedido será marcado como pago e o acesso será liberado por 30 dias.
 - [ ] **Dado** renovação confirmada antes do vencimento, **quando** atualizar a validade, **então** os 30 dias serão acrescentados à validade atual.

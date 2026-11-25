@@ -14,11 +14,6 @@ A negociação acontece fora da plataforma.
 O produto prevê uma demonstração limitada e um plano de acesso por 30 dias,
 com renovação manual. Preço e limites do plano ainda estão em definição.
 
-**Etapa atual:** prototipagem e revisão da referência visual — Atividade 06.
-As funcionalidades estão especificadas; a aplicação ainda não foi implementada.
-O protótipo foi criado no Figma; a revisão visual e a validação do acesso público
-estão pendentes. O link e as telas estão em `docs/design-tokens.md`.
-
 ## Autores
 
 - [Eduardo Padilha do Nascimento](https://github.com/eduardo-padilha-dev)
@@ -38,10 +33,14 @@ estão pendentes. O link e as telas estão em `docs/design-tokens.md`.
 - PostgreSQL
 - Vue
 
+## Protótipo
+
+[Abra a apresentação desktop do Radar Local](https://www.figma.com/proto/1CkMDJeQzb7jj7eLUlTgII/Radar-Local?node-id=3-21788&starting-point-node-id=3%3A21788).
+
+## Quick Start
+
+A partir da Entrega 2.
+
 ## Em produção
 
-<!-- Preencher quando existir uma aplicação publicada. -->
-
-## Como executar
-
-<!-- Preencher após a criação da estrutura inicial da aplicação. -->
+A partir da Entrega 3.
