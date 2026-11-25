@@ -160,6 +160,75 @@ describe('public registration', () => {
     password: 'same password',
   };
 
+  const emailConflict = {
+    statusCode: 409,
+    code: 'EMAIL_ALREADY_REGISTERED',
+    message:
+      'Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.',
+  };
+
+  it.each(['ANA@EXAMPLE.COM', '  ana@example.com  ', ' Ana@EXAMPLE.COM '])(
+    'rejects duplicate email %j and preserves the original account and token',
+    async (email) => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ ...validRegistration, phone: '42912345678' })
+        .expect(201);
+      const original = await prisma.user.findUniqueOrThrow({
+        where: { email: validRegistration.email },
+      });
+      const originalTokens = await prisma.emailVerification.findMany({
+        where: { userId: original.id },
+      });
+
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ name: 'Bia', email, password: 'another password' })
+        .expect(409, emailConflict);
+
+      expect(await prisma.user.findMany()).toEqual([original]);
+      expect(await prisma.emailVerification.findMany()).toEqual(originalTokens);
+      expect(send).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('creates one account and returns one conflict for concurrent requests', async () => {
+    const responses = await Promise.all(
+      [validRegistration.email, ' Ana@EXAMPLE.COM '].map((email) =>
+        request(app.getHttpServer())
+          .post('/auth/register')
+          .send({ ...validRegistration, email }),
+      ),
+    );
+
+    expect(responses.map(({ status }) => status).sort()).toEqual([201, 409]);
+    expect(responses.find(({ status }) => status === 409)?.body).toEqual(
+      emailConflict,
+    );
+    expect(await prisma.user.count()).toBe(1);
+    expect(await prisma.emailVerification.count()).toBe(1);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps email addresses distinct when they differ by dots or plus tags', async () => {
+    const emails = [
+      'ana@example.com',
+      'a.na@example.com',
+      'ana+tag@example.com',
+    ];
+    for (const email of emails) {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ ...validRegistration, email })
+        .expect(201);
+    }
+
+    const users = await prisma.user.findMany({ select: { email: true } });
+    expect(users.map(({ email }) => email).sort()).toEqual([...emails].sort());
+    expect(await prisma.emailVerification.count()).toBe(3);
+    expect(send).toHaveBeenCalledTimes(3);
+  });
+
   const nameRule = 'Informe um nome de 2 a 100 caracteres.';
   const emailRule = 'Informe um e-mail válido.';
   const passwordRule = 'Informe uma senha de 8 a 128 caracteres.';

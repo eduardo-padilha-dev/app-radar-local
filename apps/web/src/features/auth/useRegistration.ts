@@ -1,5 +1,6 @@
 import { reactive, ref } from "vue";
 import {
+  EmailAlreadyRegisteredError,
   register,
   RegistrationValidationError,
   type RegistrationFieldErrors,
@@ -8,7 +9,9 @@ import {
 export function useRegistration() {
   const fields = reactive({ name: "", email: "", password: "", phone: "" });
   const errors = ref<RegistrationFieldErrors>({});
-  const state = ref<"idle" | "submitting" | "success" | "email-unconfirmed" | "error">("idle");
+  const state = ref<
+    "idle" | "submitting" | "success" | "email-already-registered" | "email-unconfirmed" | "error"
+  >("idle");
   async function submit() {
     if (state.value === "submitting" || state.value === "success") return;
     errors.value = {};
@@ -27,6 +30,8 @@ export function useRegistration() {
       if (error instanceof RegistrationValidationError) {
         errors.value = error.fieldErrors;
         state.value = "idle";
+      } else if (error instanceof EmailAlreadyRegisteredError) {
+        state.value = "email-already-registered";
       } else {
         state.value = "error";
       }

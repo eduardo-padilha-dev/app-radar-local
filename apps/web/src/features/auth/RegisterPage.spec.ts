@@ -10,6 +10,34 @@ afterEach(() => {
 });
 
 describe("registration page", () => {
+  it("shows the exact guidance for an email that is already registered", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          statusCode: 409,
+          code: "EMAIL_ALREADY_REGISTERED",
+          message:
+            "Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.",
+        }),
+        { status: 409 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const page = mount(RegisterPage);
+    await page.get("#name").setValue("Ana");
+    await page.get("#email").setValue("ana@example.com");
+    await page.get("#password").setValue("same password");
+    await page.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(page.get("[role=alert]").text()).toBe(
+      "Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.",
+    );
+    expect(page.find("a").exists()).toBe(false);
+    expect(page.findAll("button").map((button) => button.attributes("type"))).toEqual(["submit"]);
+    page.unmount();
+  });
+
   it("shows each API validation message by its field and preserves entries for correction", async () => {
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(new Response(

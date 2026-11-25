@@ -56,6 +56,29 @@ describe('AppController (e2e)', () => {
     await request(app.getHttpServer()).get('/docs/').expect(200);
   });
 
+  it('documents the registration email conflict in the live OpenAPI contract', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/docs-json')
+      .expect(200);
+    const conflict =
+      response.body.paths['/auth/register'].post.responses['409'];
+    expect(conflict).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            required: ['statusCode', 'code', 'message'],
+            properties: {
+              statusCode: { type: 'integer', enum: [409] },
+              code: { type: 'string', enum: ['EMAIL_ALREADY_REGISTERED'] },
+              message: { type: 'string' },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it('uses the configured web origin for CORS', async () => {
     await request(app.getHttpServer())
       .options('/auth/register')

@@ -82,7 +82,12 @@ const { fields, errors, state, submit } = useRegistration();
         <p class="guidance">
           * Campos obrigatórios. Cadastro exclusivo para desenvolvedores freelancers.
         </p>
-        <p v-if="state === 'error'" class="error" role="alert">
+        <!-- // TODO #3: conectar ao fluxo real de reenvio da confirmação. -->
+        <!-- // TODO #4: conectar ao fluxo real de entrada. -->
+        <p v-if="state === 'email-already-registered'" class="error" role="alert">
+          Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.
+        </p>
+        <p v-else-if="state === 'error'" class="error" role="alert">
           Não foi possível concluir a solicitação.
         </p>
         <button type="submit" :disabled="state === 'submitting'">

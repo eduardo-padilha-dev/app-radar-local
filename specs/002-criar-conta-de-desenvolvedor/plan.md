@@ -92,7 +92,7 @@
   - Teste primeiro: matriz HTTP cobre obrigatórios ausentes, tipos incompatíveis, limites imediatamente abaixo/no/acima dos intervalos de nome e senha, e-mail inválido e celulares inválidos. Conferir normalização de nome/e-mail, preservação de senha com espaços e nenhum registro/envio em entrada inválida. Testar UI com erro retornado pela API, mensagem junto ao campo e preservação dos demais valores. Os testes falham enquanto faltar cada validação ou associação de erro ao campo.
   - Arquivos previstos: `apps/api/test/registration.e2e-spec.ts`, `apps/api/src/modules/auth/{dto/register.dto.ts,auth.service.ts}`, `apps/api/src/common/api-exception.filter.ts`, `apps/web/src/features/auth/{RegisterPage.vue,RegisterPage.spec.ts,useRegistration.ts,registration.service.ts}`, `apps/web/src/shared/http/client.ts`.
 
-- [ ] **Tarefa 5 — Impedir cadastro de e-mail repetido**
+- [x] **Tarefa 5 — Impedir cadastro de e-mail repetido**
   - Cobre: CA4.
   - Teste primeiro: banco/HTTP prova HTTP 409 para e-mail existente com variações de caixa/espaços, preservando todos os dados da conta original e sem novo envio. Duas solicitações simultâneas devem resultar em uma criação e um conflito. Endereços distintos por pontos ou `+` permanecem distintos. A UI deve mostrar exatamente a mensagem de CA4. Os testes falham enquanto o conflito não for traduzido ou a orientação não aparecer.
   - Arquivos previstos: `apps/api/test/registration.e2e-spec.ts`, `apps/api/src/modules/auth/auth.service.ts`, `apps/api/src/common/api-exception.filter.ts`, `apps/web/src/features/auth/{RegisterPage.spec.ts,RegisterPage.vue,useRegistration.ts,registration.service.ts}`.

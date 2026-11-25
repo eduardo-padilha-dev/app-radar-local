@@ -20,10 +20,23 @@ export class RegistrationValidationError extends Error {
   }
 }
 
+export class EmailAlreadyRegisteredError extends Error {
+  constructor() {
+    super("Este e-mail já está cadastrado.");
+  }
+}
+
 export async function register(input: RegistrationInput): Promise<RegistrationResult> {
   try {
     return await post<RegistrationResult>("/auth/register", input);
   } catch (error) {
+    if (
+      error instanceof HttpError &&
+      error.statusCode === 409 &&
+      error.code === "EMAIL_ALREADY_REGISTERED"
+    ) {
+      throw new EmailAlreadyRegisteredError();
+    }
     if (error instanceof HttpError && error.statusCode === 400 && error.code === "VALIDATION_ERROR") {
       const details = error.details;
       if (typeof details === "object" && details !== null) {

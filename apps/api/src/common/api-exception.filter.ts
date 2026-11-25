@@ -12,9 +12,24 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const response = host.switchToHttp().getResponse<Response>();
     const statusCode =
       exception instanceof HttpException ? exception.getStatus() : 500;
+    const body =
+      exception instanceof HttpException ? exception.getResponse() : undefined;
+    if (
+      statusCode === 409 &&
+      typeof body === 'object' &&
+      'code' in body &&
+      body.code === 'EMAIL_ALREADY_REGISTERED'
+    ) {
+      response.status(statusCode).json({
+        statusCode,
+        code: body.code,
+        message:
+          'Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.',
+      });
+      return;
+    }
     let details: Record<string, string[]> | undefined;
-    if (statusCode === 400 && exception instanceof HttpException) {
-      const body = exception.getResponse();
+    if (statusCode === 400) {
       if (
         typeof body === 'object' &&
         'message' in body &&
@@ -32,23 +47,21 @@ export class ApiExceptionFilter implements ExceptionFilter {
         if (fields.length) details = Object.fromEntries(fields);
       }
     }
-    response
-      .status(statusCode)
-      .json({
-        statusCode,
-        code:
-          statusCode === 400
-            ? 'VALIDATION_ERROR'
-            : statusCode >= 500
-              ? 'INTERNAL_ERROR'
-              : 'HTTP_ERROR',
-        message:
-          statusCode >= 500
-            ? 'Erro interno do servidor.'
-            : statusCode === 400
-              ? 'Verifique os campos informados.'
-              : 'Não foi possível concluir a solicitação.',
-        ...(details && { details }),
-      });
+    response.status(statusCode).json({
+      statusCode,
+      code:
+        statusCode === 400
+          ? 'VALIDATION_ERROR'
+          : statusCode >= 500
+            ? 'INTERNAL_ERROR'
+            : 'HTTP_ERROR',
+      message:
+        statusCode >= 500
+          ? 'Erro interno do servidor.'
+          : statusCode === 400
+            ? 'Verifique os campos informados.'
+            : 'Não foi possível concluir a solicitação.',
+      ...(details && { details }),
+    });
   }
 }

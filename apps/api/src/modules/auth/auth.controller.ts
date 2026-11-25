@@ -2,6 +2,7 @@ import { Body, Controller, Inject, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -49,6 +50,18 @@ export class AuthController {
             items: { type: 'string' },
           },
         },
+      },
+    },
+  })
+  @ApiConflictResponse({
+    description: 'E-mail já cadastrado.',
+    schema: {
+      type: 'object',
+      required: ['statusCode', 'code', 'message'],
+      properties: {
+        statusCode: { type: 'integer', enum: [409] },
+        code: { type: 'string', enum: ['EMAIL_ALREADY_REGISTERED'] },
+        message: { type: 'string' },
       },
     },
   })
