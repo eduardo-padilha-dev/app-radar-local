@@ -5,7 +5,7 @@ import { AppModule } from '../src/app.module.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 import { PrismaModule } from '../src/database/prisma.module.js';
 import { requireTestDatabaseUrl } from './setup-database.js';
-import { createHash } from 'node:crypto';
+import { createHash, scryptSync } from 'node:crypto';
 import { ResendEmailService } from '../src/integrations/resend/resend-email.service.js';
 import { VerificationToken } from '../src/modules/auth/verification-token.js';
 import { configureApp } from '../src/common/configure-app.js';
@@ -151,6 +151,148 @@ describe('public registration', () => {
       const user = await prisma.user.findUniqueOrThrow({ where: { email } });
       expect(user.phone).toBe(expected);
       expect(send).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  const validRegistration = {
+    name: 'Ana',
+    email: 'ana@example.com',
+    password: 'same password',
+  };
+
+  const nameRule = 'Informe um nome de 2 a 100 caracteres.';
+  const emailRule = 'Informe um e-mail válido.';
+  const passwordRule = 'Informe uma senha de 8 a 128 caracteres.';
+  const phoneRule =
+    'Informe um celular brasileiro com 11 dígitos nacionais, incluindo o DDD, e 9 depois do DDD.';
+
+  it.each([
+    {
+      label: 'missing required fields',
+      input: { phone: '' },
+      details: {
+        name: [nameRule],
+        email: [emailRule],
+        password: [passwordRule],
+      },
+    },
+    {
+      label: 'invalid types',
+      input: {
+        name: 13,
+        email: false,
+        password: ['same password'],
+        phone: { number: '42912345678' },
+      },
+      details: {
+        name: [nameRule],
+        email: [emailRule],
+        password: [passwordRule],
+        phone: [phoneRule],
+      },
+    },
+    {
+      label: 'empty required fields',
+      input: { name: ' ', email: ' ', password: '' },
+      details: {
+        name: [nameRule],
+        email: [emailRule],
+        password: [passwordRule],
+      },
+    },
+    {
+      label: 'null phone',
+      input: { ...validRegistration, phone: null },
+      details: { phone: [phoneRule] },
+    },
+    {
+      label: 'name below minimum after trimming',
+      input: { ...validRegistration, name: ' A ' },
+      details: { name: [nameRule] },
+    },
+    {
+      label: 'name above maximum',
+      input: { ...validRegistration, name: 'A'.repeat(101) },
+      details: { name: [nameRule] },
+    },
+    {
+      label: 'password below minimum',
+      input: { ...validRegistration, password: 'seven!!' },
+      details: { password: [passwordRule] },
+    },
+    {
+      label: 'password above maximum',
+      input: { ...validRegistration, password: 'a'.repeat(129) },
+      details: { password: [passwordRule] },
+    },
+    {
+      label: 'invalid email',
+      input: { ...validRegistration, email: 'ana.example.com' },
+      details: { email: [emailRule] },
+    },
+    ...[
+      '91234-5678',
+      '4291234567',
+      '429123456789',
+      '(42) 81234-5678',
+      '+54 (42) 91234-5678',
+      '55 (42) 91234-5678',
+      '(42) 91234-5678a',
+      '(42) 91234.5678',
+      '()-',
+      '+55',
+    ].map((phone) => ({
+      label: `invalid phone ${phone}`,
+      input: { ...validRegistration, phone },
+      details: { phone: [phoneRule] },
+    })),
+  ])(
+    'reports $label by field without creating an account or sending email',
+    async ({ input, details }) => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send(input);
+
+      expect(response.body).toEqual({
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Verifique os campos informados.',
+        details,
+      });
+      expect(response.status).toBe(400);
+      expect(await prisma.user.count()).toBe(0);
+      expect(await prisma.emailVerification.count()).toBe(0);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { label: 'minimum', name: 'Al', password: ' secret ' },
+    { label: 'maximum', name: 'A'.repeat(100), password: ' '.repeat(128) },
+  ])(
+    'accepts the $label limits and normalizes name and email while preserving password spaces',
+    async ({ name, password }) => {
+      const email = 'ana.silva+teste@example.com';
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          name: ` ${name} `,
+          email: ' Ana.Silva+Teste@EXAMPLE.COM ',
+          password,
+        })
+        .expect(201);
+
+      const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+      expect(user.name).toBe(name);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(send).toHaveBeenCalledWith(email, expect.any(String));
+      const [, , , , , , salt, hash] = user.passwordHash.split('$');
+      const expectedHash = scryptSync(
+        password,
+        Buffer.from(salt!, 'base64url'),
+        64,
+      );
+      expect(hash).toBe(expectedHash.toString('base64url'));
     },
   );
 

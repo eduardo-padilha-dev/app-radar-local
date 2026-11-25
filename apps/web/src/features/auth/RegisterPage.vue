@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRegistration } from "./useRegistration";
-const { fields, state, submit } = useRegistration();
+const { fields, errors, state, submit } = useRegistration();
 </script>
 
 <template>
@@ -21,11 +21,20 @@ const { fields, state, submit } = useRegistration();
         </p>
         <p class="guidance">Abra o link recebido para confirmar seu e-mail.</p>
       </template>
-      <form v-else :aria-busy="state === 'submitting'" @submit.prevent="submit">
+      <form v-else novalidate :aria-busy="state === 'submitting'" @submit.prevent="submit">
         <div class="fields">
           <label for="name"
             >Nome *
-            <input id="name" v-model="fields.name" name="name" autocomplete="name" required />
+            <input
+              id="name"
+              v-model="fields.name"
+              name="name"
+              autocomplete="name"
+              required
+              :aria-invalid="errors.name ? true : undefined"
+              :aria-describedby="errors.name ? 'name-error' : undefined"
+            />
+            <span v-if="errors.name" id="name-error" class="error" role="alert">{{ errors.name }}</span>
           </label>
           <label for="email"
             >E-mail *
@@ -36,7 +45,10 @@ const { fields, state, submit } = useRegistration();
               type="email"
               autocomplete="email"
               required
+              :aria-invalid="errors.email ? true : undefined"
+              :aria-describedby="errors.email ? 'email-error' : undefined"
             />
+            <span v-if="errors.email" id="email-error" class="error" role="alert">{{ errors.email }}</span>
           </label>
           <label for="password"
             >Senha *
@@ -47,7 +59,10 @@ const { fields, state, submit } = useRegistration();
               type="password"
               autocomplete="new-password"
               required
+              :aria-invalid="errors.password ? true : undefined"
+              :aria-describedby="errors.password ? 'password-error' : undefined"
             />
+            <span v-if="errors.password" id="password-error" class="error" role="alert">{{ errors.password }}</span>
           </label>
           <label for="phone"
             >Celular (opcional)
@@ -58,7 +73,10 @@ const { fields, state, submit } = useRegistration();
               type="tel"
               autocomplete="tel"
               placeholder="DDD + número"
+              :aria-invalid="errors.phone ? true : undefined"
+              :aria-describedby="errors.phone ? 'phone-error' : undefined"
             />
+            <span v-if="errors.phone" id="phone-error" class="error" role="alert">{{ errors.phone }}</span>
           </label>
         </div>
         <p class="guidance">

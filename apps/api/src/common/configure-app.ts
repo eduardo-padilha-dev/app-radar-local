@@ -13,6 +13,7 @@ export function configureApp(app: INestApplication) {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      errorFormat: 'grouped',
       transformOptions: { enableImplicitConversion: false },
     }),
   );

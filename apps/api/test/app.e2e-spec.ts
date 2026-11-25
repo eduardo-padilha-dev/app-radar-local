@@ -65,6 +65,38 @@ describe('AppController (e2e)', () => {
       .expect('Access-Control-Allow-Origin', 'https://web.example');
   });
 
+  it('documents the registration validation response and optional field errors', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/docs-json')
+      .expect(200);
+    const operation = response.body.paths['/auth/register'].post;
+    expect(operation.responses['400']).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            required: expect.arrayContaining(['statusCode', 'code', 'message']),
+            properties: {
+              statusCode: { type: 'integer', enum: [400] },
+              code: { type: 'string', enum: ['VALIDATION_ERROR'] },
+              message: { type: 'string' },
+              details: {
+                type: 'object',
+                additionalProperties: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(
+      operation.responses['400'].content['application/json'].schema.required,
+    ).not.toContain('details');
+  });
+
   it('applies DTO validation globally and exposes a safe error contract', async () => {
     await request(app.getHttpServer())
       .post('/auth/register')
@@ -74,6 +106,7 @@ describe('AppController (e2e)', () => {
         statusCode: 400,
         code: 'VALIDATION_ERROR',
         message: 'Verifique os campos informados.',
+        details: { name: ['Informe um nome de 2 a 100 caracteres.'] },
       });
     await request(app.getHttpServer())
       .get('/missing')

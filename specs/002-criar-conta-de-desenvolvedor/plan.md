@@ -87,7 +87,7 @@
   - Teste primeiro: parametrizar cadastro sem `phone`, com string vazia, com número nacional e com número formatado contendo `+55`; verificar persistência nula ou normalizada e envio único. Na UI, completar cadastro sem celular, conferir os campos exibidos e a ausência de CPF. Os testes devem falhar enquanto a implementação não tratar as variantes.
   - Arquivos previstos: `apps/api/test/registration.e2e-spec.ts`, `apps/api/src/modules/auth/{dto/register.dto.ts,auth.service.ts}`, `apps/web/src/features/auth/{RegisterPage.vue,RegisterPage.spec.ts,registration.service.ts}`.
 
-- [ ] **Tarefa 4 — Apresentar erros de validação por campo**
+- [x] **Tarefa 4 — Apresentar erros de validação por campo**
   - Cobre: CA3.
   - Teste primeiro: matriz HTTP cobre obrigatórios ausentes, tipos incompatíveis, limites imediatamente abaixo/no/acima dos intervalos de nome e senha, e-mail inválido e celulares inválidos. Conferir normalização de nome/e-mail, preservação de senha com espaços e nenhum registro/envio em entrada inválida. Testar UI com erro retornado pela API, mensagem junto ao campo e preservação dos demais valores. Os testes falham enquanto faltar cada validação ou associação de erro ao campo.
   - Arquivos previstos: `apps/api/test/registration.e2e-spec.ts`, `apps/api/src/modules/auth/{dto/register.dto.ts,auth.service.ts}`, `apps/api/src/common/api-exception.filter.ts`, `apps/web/src/features/auth/{RegisterPage.vue,RegisterPage.spec.ts,useRegistration.ts,registration.service.ts}`, `apps/web/src/shared/http/client.ts`.

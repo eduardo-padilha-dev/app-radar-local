@@ -1,12 +1,17 @@
 import { reactive, ref } from "vue";
-import { register } from "./registration.service";
+import {
+  register,
+  RegistrationValidationError,
+  type RegistrationFieldErrors,
+} from "./registration.service";
 
 export function useRegistration() {
   const fields = reactive({ name: "", email: "", password: "", phone: "" });
-  const errors = ref<Record<string, string>>({});
+  const errors = ref<RegistrationFieldErrors>({});
   const state = ref<"idle" | "submitting" | "success" | "email-unconfirmed" | "error">("idle");
   async function submit() {
     if (state.value === "submitting" || state.value === "success") return;
+    errors.value = {};
     state.value = "submitting";
     try {
       const input = {
@@ -18,8 +23,13 @@ export function useRegistration() {
       await register(input);
       fields.password = "";
       state.value = "success";
-    } catch {
-      state.value = "error";
+    } catch (error) {
+      if (error instanceof RegistrationValidationError) {
+        errors.value = error.fieldErrors;
+        state.value = "idle";
+      } else {
+        state.value = "error";
+      }
     }
   }
   return { fields, errors, state, submit };
