@@ -17,7 +17,6 @@ com renovação manual. Preço e limites do plano ainda estão em definição.
 **Etapa atual:** fundação do monorepo — Atividade 08.
 API e frontend de demonstração, sem funcionalidades de negócio. O banco de
 desenvolvimento nasce vazio, sem modelos Prisma nem migrations.
-O protótipo e as telas estão em `docs/design-tokens.md`.
 
 ## Autores
 
@@ -38,11 +37,15 @@ O protótipo e as telas estão em `docs/design-tokens.md`.
 - PostgreSQL
 - Vue
 
+## Protótipo
+
+[Abra a apresentação desktop do Radar Local](https://www.figma.com/proto/1CkMDJeQzb7jj7eLUlTgII/Radar-Local?node-id=3-21788&starting-point-node-id=3%3A21788).
+
 ## Em produção
 
-<!-- Preencher quando existir uma aplicação publicada. -->
+A partir da Entrega 3.
 
-## Como executar
+## Quick Start
 
 Requisitos: Node.js 24.x, npm 11.x e Docker com Compose.
 
