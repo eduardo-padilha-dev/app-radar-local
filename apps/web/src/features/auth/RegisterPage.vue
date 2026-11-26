@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { useRegistration } from "./useRegistration";
+import { useVerificationResend } from "./useVerificationResend";
+
 const { fields, errors, state, submit } = useRegistration();
+const { message: resendMessage, blocked: resendBlocked, resend } = useVerificationResend();
 </script>
 
 <template>
@@ -15,16 +18,20 @@ const { fields, errors, state, submit } = useRegistration();
         <p class="description">Organize sua prospecção em um só lugar.</p>
       </div>
       <template v-if="state === 'success'">
-        <!-- // TODO #3: conectar à confirmação e ao reenvio, incluindo falha do envio inicial. -->
         <p class="success" role="status">
           Conta criada. Confira seu e-mail para confirmar o cadastro.
         </p>
         <p class="guidance">Abra o link recebido para confirmar seu e-mail.</p>
       </template>
-      <!-- // TODO #3: conectar ao fluxo real de reenvio da confirmação. -->
-      <p v-else-if="state === 'email-unconfirmed'" class="error" role="alert">
-        Sua conta foi criada, mas não conseguimos confirmar o envio do e-mail de confirmação. Tente reenviar o link.
-      </p>
+      <template v-else-if="state === 'email-unconfirmed'">
+        <p class="error" role="alert">
+          Sua conta foi criada, mas não conseguimos confirmar o envio do e-mail de confirmação. Tente reenviar o link.
+        </p>
+        <button type="button" :disabled="resendBlocked" @click="resend(fields.email)">
+          Reenviar link de confirmação
+        </button>
+        <p v-if="resendMessage" class="guidance" role="status">{{ resendMessage }}</p>
+      </template>
       <form v-else novalidate :aria-busy="state === 'submitting'" @submit.prevent="submit">
         <div class="fields">
           <label for="name"

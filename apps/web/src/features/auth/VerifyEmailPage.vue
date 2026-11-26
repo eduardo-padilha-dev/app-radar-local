@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useEmailVerification } from "./useEmailVerification";
+import { useVerificationResend } from "./useVerificationResend";
 
 const route = useRoute();
 const { state, confirm } = useEmailVerification();
+const resendEmail = ref("");
+const { message: resendMessage, blocked: resendBlocked, resend } = useVerificationResend();
 
 function confirmLink() {
   return confirm(route.query.token);
@@ -32,12 +35,19 @@ onMounted(confirmLink);
         <p class="error" role="alert">O link de confirmação expirou.</p>
         <details class="resend">
           <summary>Reenviar link de confirmação</summary>
-          <!-- TODO #3: conectar o envio do formulário na tarefa 5. -->
-          <form @submit.prevent>
-            <p>O reenvio estará disponível em breve.</p>
+          <form @submit.prevent="resend(resendEmail)">
             <label for="resend-email">E-mail</label>
-            <input id="resend-email" type="email" name="email" autocomplete="email" disabled />
-            <button type="submit" disabled>Reenviar</button>
+            <input
+              id="resend-email"
+              v-model="resendEmail"
+              type="email"
+              name="email"
+              autocomplete="email"
+              required
+              :disabled="resendBlocked"
+            />
+            <button type="submit" :disabled="resendBlocked || !resendEmail.trim()">Reenviar</button>
+            <p v-if="resendMessage" role="status">{{ resendMessage }}</p>
           </form>
         </details>
       </template>
@@ -127,9 +137,28 @@ h1 {
   padding: var(--espaco-sm) var(--espaco-md);
   border: 1px solid var(--desabilitado);
   border-radius: 0.25rem;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+}
+.resend button:enabled {
+  background: var(--primaria);
+  color: var(--superficie);
+  font-weight: 600;
+  cursor: pointer;
+}
+.resend button:hover:enabled {
+  background: var(--primaria-hover);
+}
+.resend input:disabled,
+.resend button:disabled {
   background: var(--desabilitado);
   color: var(--texto-suave);
-  font: inherit;
+}
+.resend input:focus-visible,
+.resend button:focus-visible {
+  outline: 2px solid var(--primaria);
+  outline-offset: 3px;
 }
 @media (max-width: 40rem) {
   .access-header,

@@ -8,6 +8,7 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiBadGatewayResponse,
   ApiBadRequestResponse,
   ApiBody,
@@ -29,6 +30,8 @@ import { EmailVerificationResult } from './dto/email-verification-result.dto.js'
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { RegistrationResult } from './dto/registration-result.dto.js';
+import { ResendVerificationDto } from './dto/resend-verification.dto.js';
+import { ResendVerificationResult } from './dto/resend-verification-result.dto.js';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -156,5 +159,28 @@ export class AuthController {
   })
   verifyEmail(@Body() input: VerifyEmailDto): Promise<EmailVerificationResult> {
     return this.auth.verifyEmail(input.token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiBody({ type: ResendVerificationDto })
+  @ApiExtraModels(ResendVerificationResult)
+  @ApiAcceptedResponse({
+    description: 'Resposta genérica para uma solicitação de reenvio.',
+    schema: {
+      type: 'object',
+      required: ['data'],
+      properties: {
+        data: { $ref: getSchemaPath(ResendVerificationResult) },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'E-mail ou corpo da solicitação inválido.',
+  })
+  resendVerification(
+    @Body() input: ResendVerificationDto,
+  ): Promise<ResendVerificationResult> {
+    return this.auth.resendVerification(input.email);
   }
 }

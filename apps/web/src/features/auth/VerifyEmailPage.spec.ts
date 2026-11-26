@@ -99,6 +99,43 @@ it("identifies an expired link and offers resend with an email field", async () 
   }
 });
 
+it("requests a new link from the expired link page and shows a generic response", async () => {
+  const fetchMock = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ code: "VERIFICATION_LINK_EXPIRED" }), { status: 410 }),
+    )
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { retryAfterSeconds: 60 } }), { status: 202 }),
+    );
+  vi.stubGlobal("fetch", fetchMock);
+  const page = await openVerificationPage("/confirmar-email?token=" + "A".repeat(43));
+  try {
+    await page.get("summary").trigger("click");
+    await page.get("#resend-email").setValue("ana@example.com");
+    expect(page.get("button[type=submit]").attributes("disabled")).toBeUndefined();
+    await page.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringMatching(/\/auth\/resend-verification$/),
+      expect.objectContaining({
+        method: "POST",
+        credentials: "omit",
+        body: JSON.stringify({ email: "ana@example.com" }),
+      }),
+    );
+    expect(page.get("[role=status]").text()).toContain(
+      "Se houver uma conta pendente para este e-mail, verifique sua caixa de entrada.",
+    );
+    expect(page.get("[role=status]").text()).toContain("60 segundos");
+    expect(page.get<HTMLInputElement>("#resend-email").element.value).toBe("ana@example.com");
+    expect(page.get("button[type=submit]").attributes("disabled")).toBeDefined();
+  } finally {
+    page.unmount();
+  }
+});
+
 it.each([
   ["before confirmation was saved", false, "E-mail confirmado"],
   ["after confirmation was saved", true, "E-mail já confirmado"],

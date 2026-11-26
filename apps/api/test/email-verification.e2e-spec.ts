@@ -1,4 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  setImmediate as nextTurn,
+  setTimeout as delay,
+} from 'node:timers/promises';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -6,8 +10,11 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/common/configure-app.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 import { ResendEmailService } from '../src/integrations/resend/resend-email.service.js';
+import { AuthService } from '../src/modules/auth/auth.service.js';
 import { SearchEmailEligibilityService } from '../src/modules/auth/search-email-eligibility.service.js';
 import { requireTestDatabaseUrl } from './setup-database.js';
+
+vi.mock('node:timers/promises', { spy: true });
 
 vi.hoisted(() => {
   process.env.RESEND_API_KEY = 'test-key';
@@ -38,6 +45,7 @@ describe('email verification', () => {
     email = `verify-${randomUUID()}@example.com`;
     send.mockReset();
     send.mockResolvedValue(undefined);
+    vi.mocked(delay).mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -316,6 +324,161 @@ describe('email verification', () => {
     expect(
       body.components.schemas.EmailVerificationResult.properties.status.enum,
     ).toEqual(['confirmed', 'already-confirmed']);
+  });
+
+  const resendResult = { data: { retryAfterSeconds: 60 } };
+
+  function requestResend(address = email) {
+    return request(app.getHttpServer())
+      .post('/auth/resend-verification')
+      .send({ email: address });
+  }
+
+  it.each(['an expired link', 'an unconfirmed registration send'])(
+    'issues a different 24-hour link for the pending account after %s',
+    async (entryPoint) => {
+      const initialIssue = new Date('2026-11-10T00:00:00.000Z');
+      const clock = vi
+        .spyOn(Date, 'now')
+        .mockReturnValue(initialIssue.getTime());
+      if (entryPoint === 'an expired link') {
+        const token = await registerAndReadLink();
+        clock.mockReturnValue(initialIssue.getTime() + 24 * 60 * 60 * 1000);
+        await request(app.getHttpServer())
+          .post('/auth/verify-email')
+          .send({ token })
+          .expect(410);
+      } else {
+        send.mockRejectedValueOnce(new Error('Initial send not accepted'));
+        await request(app.getHttpServer())
+          .post('/auth/register')
+          .send({ name: 'Ana', email, password: 'same password' })
+          .expect(502);
+        clock.mockReturnValue(initialIssue.getTime() + 60 * 1000);
+      }
+
+      const pending = await prisma.user.findUniqueOrThrow({ where: { email } });
+      expect(pending.emailVerifiedAt).toBeNull();
+      const resendExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await requestResend('  ' + email.toUpperCase() + '  ').expect(
+        202,
+        resendResult,
+      );
+      expect(send).toHaveBeenCalledTimes(2);
+
+      const [recipient, newLink] = send.mock.calls[1]!;
+      expect(recipient).toBe(email);
+      expect(newLink).not.toBe(send.mock.calls[0]![1]);
+      const link = new URL(newLink);
+      expect(link.pathname).toBe('/confirmar-email');
+      const token = link.searchParams.get('token')!;
+      expect(token).toBeTruthy();
+      const tokenHash = createHash('sha256').update(token).digest('hex');
+      const newVerification = await prisma.emailVerification.findUniqueOrThrow({
+        where: { tokenHash },
+      });
+      expect(newVerification).toMatchObject({
+        userId: pending.id,
+        email,
+        expiresAt: resendExpiry,
+        usedAt: null,
+      });
+
+      const confirmedAt = new Date(resendExpiry.getTime() - 1);
+      clock.mockReturnValue(confirmedAt.getTime());
+      await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ token })
+        .expect(200, { data: { status: 'confirmed' } });
+
+      await expectUnchangedState(
+        { ...pending, emailVerifiedAt: confirmedAt },
+        { ...newVerification, usedAt: confirmedAt },
+      );
+    },
+  );
+
+  it('returns the generic response without sending to missing or already confirmed accounts', async () => {
+    const issuedAt = new Date('2026-11-10T00:00:00.000Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(issuedAt.getTime());
+    const { token, user } = await registerAndReadState();
+    await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send({ token })
+      .expect(200);
+    clock.mockReturnValue(issuedAt.getTime() + 61_000);
+    send.mockClear();
+
+    await Promise.all([
+      requestResend().expect(202, resendResult),
+      requestResend('missing-' + randomUUID() + '@example.com').expect(
+        202,
+        resendResult,
+      ),
+    ]);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(
+      await prisma.emailVerification.count({ where: { userId: user.id } }),
+    ).toBe(1);
+  });
+
+  it('issues one new link for concurrent requests outside the resend interval', async () => {
+    const issuedAt = new Date('2026-11-10T00:00:00.000Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(issuedAt.getTime());
+    const { user } = await registerAndReadState();
+    clock.mockReturnValue(issuedAt.getTime() + 61_000);
+    send.mockClear();
+
+    await Promise.all([
+      requestResend().expect(202, resendResult),
+      requestResend().expect(202, resendResult),
+    ]);
+
+    expect(send).toHaveBeenCalledExactlyOnceWith(email, expect.any(String));
+    expect(
+      await prisma.emailVerification.count({ where: { userId: user.id } }),
+    ).toBe(2);
+  });
+
+  function deferred() {
+    let resolve!: () => void;
+    const promise = new Promise<void>((finish) => {
+      resolve = finish;
+    });
+    return { promise, resolve };
+  }
+
+  it('waits for the resend to finish even if the public window has elapsed', async () => {
+    const issuedAt = new Date('2026-11-10T00:00:00.000Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(issuedAt.getTime());
+    await registerAndReadLink();
+    clock.mockReturnValue(issuedAt.getTime() + 61_000);
+
+    const sendStarted = deferred();
+    const sendFinished = deferred();
+    const windowElapsed = deferred();
+    vi.mocked(delay).mockReturnValueOnce(windowElapsed.promise);
+    send.mockImplementationOnce(() => {
+      sendStarted.resolve();
+      return sendFinished.promise;
+    });
+
+    const resend = app.get(AuthService).resendVerification(email);
+    try {
+      await sendStarted.promise;
+      windowElapsed.resolve();
+      const responded = await Promise.race([
+        resend.then(() => true),
+        nextTurn().then(() => false),
+      ]);
+      expect(responded).toBe(false);
+    } finally {
+      windowElapsed.resolve();
+      sendFinished.resolve();
+      await resend;
+    }
+    await expect(resend).resolves.toEqual(resendResult.data);
   });
 
   async function registerAndReadState() {

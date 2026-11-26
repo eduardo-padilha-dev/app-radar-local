@@ -46,6 +46,59 @@ describe("registration page", () => {
     }
   });
 
+  it("requests a new link on the registration page using the email already entered", async () => {
+    const email = "Ana@example.com";
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          code: "VERIFICATION_EMAIL_UNCONFIRMED",
+          details: { accountCreated: true, emailVerificationPending: true },
+        }),
+        { status: 502 },
+      ))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { retryAfterSeconds: 60 } }), { status: 202 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: existingRouter.options.routes,
+    });
+    await router.push("/criar-conta");
+    await router.isReady();
+    const page = mount(App, { global: { plugins: [router] } });
+    try {
+      await flushPromises();
+      await page.get("#name").setValue("Ana");
+      await page.get("#email").setValue(email);
+      await page.get("#password").setValue("same password");
+      await page.get("form").trigger("submit");
+      await flushPromises();
+
+      const resend = page.get("button");
+      expect(resend.text()).toBe("Reenviar link de confirmação");
+      await resend.trigger("click");
+      await flushPromises();
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        expect.stringMatching(/\/auth\/resend-verification$/),
+        expect.objectContaining({
+          method: "POST",
+          credentials: "omit",
+          body: JSON.stringify({ email }),
+        }),
+      );
+      expect(page.get("[role=status]").text()).toContain(
+        "Se houver uma conta pendente para este e-mail, verifique sua caixa de entrada.",
+      );
+      expect(page.get("[role=status]").text()).toContain("60 segundos");
+      expect(resend.attributes("disabled")).toBeDefined();
+    } finally {
+      page.unmount();
+    }
+  });
+
   it.each(["before the headers", "while reading the body"] as const)(
     "allows retry after losing the first registration response %s",
     async (failure) => {

@@ -21,3 +21,11 @@ export async function verifyEmail(token: string): Promise<EmailVerificationOutco
     throw error;
   }
 }
+
+interface ResendVerificationResult {
+  retryAfterSeconds: number;
+}
+
+export function resendVerification(email: string): Promise<ResendVerificationResult> {
+  return post<ResendVerificationResult>("/auth/resend-verification", { email });
+}
