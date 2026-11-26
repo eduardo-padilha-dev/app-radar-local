@@ -1,4 +1,4 @@
-import { HttpError, post } from "../../shared/http/client";
+import { HttpError, HttpTransportError, post } from "../../shared/http/client";
 
 export interface RegistrationInput {
   name: string;
@@ -32,10 +32,19 @@ export class VerificationEmailUnconfirmedError extends Error {
   }
 }
 
+export class RegistrationOutcomeUnknownError extends Error {
+  constructor(cause: unknown) {
+    super("Não conseguimos confirmar o resultado do cadastro.", { cause });
+  }
+}
+
 export async function register(input: RegistrationInput): Promise<RegistrationResult> {
   try {
     return await post<RegistrationResult>("/auth/register", input);
   } catch (error) {
+    if (error instanceof HttpTransportError) {
+      throw new RegistrationOutcomeUnknownError(error);
+    }
     if (
       error instanceof HttpError &&
       error.statusCode === 409 &&

@@ -8,6 +8,12 @@ export class HttpError extends Error {
   }
 }
 
+export class HttpTransportError extends Error {
+  constructor(cause: unknown) {
+    super("Não foi possível receber a resposta da API.", { cause });
+  }
+}
+
 export async function post<T>(path: string, body: unknown): Promise<T> {
   const baseUrl = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
   const response = await fetch(`${baseUrl}${path}`, {
@@ -15,6 +21,8 @@ export async function post<T>(path: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     credentials: "omit",
     body: JSON.stringify(body),
+  }).catch((cause: unknown) => {
+    throw new HttpTransportError(cause);
   });
   if (!response.ok) {
     const payload: unknown = await response.json().catch(() => undefined);
@@ -25,6 +33,9 @@ export async function post<T>(path: string, body: unknown): Promise<T> {
     }
     throw new HttpError(response.status);
   }
-  const envelope = (await response.json()) as { data: T };
+  const envelope = (await response.json().catch((cause: unknown) => {
+    if (cause instanceof TypeError) throw new HttpTransportError(cause);
+    throw cause;
+  })) as { data: T };
   return envelope.data;
 }

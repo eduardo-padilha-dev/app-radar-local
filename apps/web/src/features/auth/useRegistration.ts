@@ -2,6 +2,7 @@ import { reactive, ref } from "vue";
 import {
   EmailAlreadyRegisteredError,
   register,
+  RegistrationOutcomeUnknownError,
   RegistrationValidationError,
   VerificationEmailUnconfirmedError,
   type RegistrationFieldErrors,
@@ -11,7 +12,13 @@ export function useRegistration() {
   const fields = reactive({ name: "", email: "", password: "", phone: "" });
   const errors = ref<RegistrationFieldErrors>({});
   const state = ref<
-    "idle" | "submitting" | "success" | "email-already-registered" | "email-unconfirmed" | "error"
+    | "idle"
+    | "submitting"
+    | "success"
+    | "email-already-registered"
+    | "email-unconfirmed"
+    | "outcome-unknown"
+    | "error"
   >("idle");
   async function submit() {
     if (
@@ -40,6 +47,8 @@ export function useRegistration() {
       } else if (error instanceof VerificationEmailUnconfirmedError) {
         fields.password = "";
         state.value = "email-unconfirmed";
+      } else if (error instanceof RegistrationOutcomeUnknownError) {
+        state.value = "outcome-unknown";
       } else {
         state.value = "error";
       }

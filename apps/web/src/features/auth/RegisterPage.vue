@@ -91,6 +91,9 @@ const { fields, errors, state, submit } = useRegistration();
         <p v-if="state === 'email-already-registered'" class="error" role="alert">
           Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.
         </p>
+        <p v-else-if="state === 'outcome-unknown'" class="error" role="alert">
+          Não conseguimos confirmar o resultado do cadastro. Tente novamente.
+        </p>
         <p v-else-if="state === 'error'" class="error" role="alert">
           Não foi possível concluir a solicitação.
         </p>

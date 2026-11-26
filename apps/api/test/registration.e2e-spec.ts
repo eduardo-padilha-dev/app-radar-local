@@ -274,6 +274,29 @@ describe('public registration', () => {
     },
   );
 
+  it('preserves the first registration when an identical request follows a discarded response', async () => {
+    // Complete the first request and discard its response instead of reading the result.
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send(validRegistration)
+      .expect(201);
+    const original = await prisma.user.findUniqueOrThrow({
+      where: { email: validRegistration.email },
+    });
+    const originalVerification = await prisma.emailVerification.findFirstOrThrow({
+      where: { userId: original.id },
+    });
+
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send(validRegistration)
+      .expect(409, emailConflict);
+
+    expect(await prisma.user.findMany()).toEqual([original]);
+    expect(await prisma.emailVerification.findMany()).toEqual([originalVerification]);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it('creates one account and returns one conflict for concurrent requests', async () => {
     const responses = await Promise.all(
       [validRegistration.email, ' Ana@EXAMPLE.COM '].map((email) =>

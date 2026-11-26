@@ -14,21 +14,16 @@ describe("registration page", () => {
     [502, "VERIFICATION_EMAIL_UNCONFIRMED", true],
     [502, "INTERNAL_ERROR", false],
     [500, "VERIFICATION_EMAIL_UNCONFIRMED", false],
-    [0, "NETWORK_ERROR", false],
   ])("handles status %i and code %s without assuming delivery", async (status, code, created) => {
     const fetchMock = vi.fn<typeof fetch>();
-    if (status === 0) {
-      fetchMock.mockRejectedValueOnce(new TypeError("Network request failed"));
-    } else {
-      fetchMock.mockResolvedValueOnce(new Response(
-        JSON.stringify({
-          statusCode: status,
-          code,
-          details: { accountCreated: true, emailVerificationPending: true },
-        }),
-        { status },
-      ));
-    }
+    fetchMock.mockResolvedValueOnce(new Response(
+      JSON.stringify({
+        statusCode: status,
+        code,
+        details: { accountCreated: true, emailVerificationPending: true },
+      }),
+      { status },
+    ));
     vi.stubGlobal("fetch", fetchMock);
     const page = mount(RegisterPage);
     try {
@@ -50,6 +45,67 @@ describe("registration page", () => {
       page.unmount();
     }
   });
+
+  it.each(["before the headers", "while reading the body"] as const)(
+    "allows retry after losing the first registration response %s",
+    async (failure) => {
+      const input = { name: "Ana", email: "ana@example.com", password: "same password" };
+      const duplicateMessage =
+        "Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.";
+      const registeredEmails = new Set<string>();
+      const fetchMock = vi.fn<typeof fetch>(async (_url, options) => {
+        const { email } = JSON.parse(String(options?.body)) as { email: string };
+        if (registeredEmails.has(email)) {
+          return new Response(
+            JSON.stringify({ statusCode: 409, code: "EMAIL_ALREADY_REGISTERED" }),
+            { status: 409 },
+          );
+        }
+
+        registeredEmails.add(email);
+        const networkError = new TypeError("Network request failed");
+        if (failure === "before the headers") throw networkError;
+        const body = new ReadableStream({
+          start(controller) {
+            controller.error(networkError);
+          },
+        });
+        return new Response(body, { status: 201 });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const page = mount(RegisterPage);
+      try {
+        for (const [field, value] of Object.entries(input)) {
+          await page.get(`#${field}`).setValue(value);
+        }
+        await page.get("form").trigger("submit");
+        await flushPromises();
+
+        expect(registeredEmails).toEqual(new Set([input.email]));
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(page.get("[role=alert]").text()).toBe(
+          "Não conseguimos confirmar o resultado do cadastro. Tente novamente.",
+        );
+        expect(page.find("[role=status]").exists()).toBe(false);
+        expect(page.get("button[type=submit]").attributes("disabled")).toBeUndefined();
+        for (const [field, value] of Object.entries(input)) {
+          expect(page.get<HTMLInputElement>(`#${field}`).element.value).toBe(value);
+        }
+
+        await page.get("form").trigger("submit");
+        await flushPromises();
+
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveBeenLastCalledWith(
+          expect.stringMatching(/\/auth\/register$/),
+          expect.objectContaining({ body: JSON.stringify(input) }),
+        );
+        expect(page.get("[role=alert]").text()).toBe(duplicateMessage);
+      } finally {
+        page.unmount();
+      }
+    },
+  );
 
   it("shows the exact guidance for an email that is already registered", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
