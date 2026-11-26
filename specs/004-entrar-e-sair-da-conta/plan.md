@@ -11,7 +11,7 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Verificar senhas cadastradas**
+- [x] **Tarefa 1 — Verificar senhas cadastradas**
   - Cobre CA1 e CA2 como pré-requisito técnico.
   - Teste primeiro — um hash já emitido pelo cadastro aceita a senha original e recusa senha errada ou hash inválido. Hoje o hasher oferece apenas geração.
   - Arquivos previstos — `apps/api/src/modules/auth/password-hasher.ts` e `password-hasher.spec.ts`.
