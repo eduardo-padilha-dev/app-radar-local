@@ -70,6 +70,56 @@ it.each([
   }
 });
 
+it.each([
+  {
+    scenario: "unknown email",
+    email: "unknown@example.com",
+    password: "original password",
+  },
+  {
+    scenario: "wrong password",
+    email: "ana@example.com",
+    password: "wrong password",
+  },
+  {
+    scenario: "inactive account",
+    email: "inactive@example.com",
+    password: "original password",
+  },
+])("displays the same login message for $scenario", async ({ email, password }) => {
+  const apiError = {
+    statusCode: 401,
+    code: "HTTP_ERROR",
+    message: "Não foi possível concluir a solicitação.",
+  };
+  const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(JSON.stringify(apiError), { status: 401 }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  await router.push("/entrar");
+  const page = mount(App, { global: { plugins: [router] } });
+
+  try {
+    await page.get('input[type="email"]').setValue(email);
+    await page.get('input[type="password"]').setValue(password);
+    await page.get("form").trigger("submit");
+
+    await vi.waitFor(() => {
+      expect(page.get('[role="alert"]').text()).toBe("Não foi possível entrar na sua conta.");
+    });
+    expect(router.currentRoute.value.name).toBe("login");
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(/\/auth\/login$/),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      }),
+    );
+  } finally {
+    page.unmount();
+  }
+});
+
 it("returns to the login page when private navigation has no session", async () => {
   const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
     new Response(null, { status: 401 }),

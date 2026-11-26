@@ -28,10 +28,11 @@ export class AuthSessionService {
       where: { email },
       select: { ...profileFields, isActive: true, passwordHash: true },
     });
-    if (
-      !account?.isActive ||
-      !(await this.passwordHasher.verify(password, account.passwordHash))
-    ) {
+    const passwordMatches = await this.passwordHasher.verify(
+      password,
+      account?.passwordHash,
+    );
+    if (!account?.isActive || !passwordMatches) {
       throw new UnauthorizedException();
     }
 

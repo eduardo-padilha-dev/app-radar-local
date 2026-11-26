@@ -8,6 +8,7 @@ import {
   type INestApplication,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { scrypt } from 'node:crypto';
 import request from 'supertest';
 import type { Response } from 'supertest';
 import type { App } from 'supertest/types.js';
@@ -24,6 +25,8 @@ import {
 import { AuthModule } from '../src/modules/auth/auth.module.js';
 import { PasswordHasher } from '../src/modules/auth/password-hasher.js';
 import { requireTestDatabaseUrl } from './setup-database.js';
+
+vi.mock(import('node:crypto'), { spy: true });
 
 vi.hoisted(() => {
   process.env.RESEND_API_KEY = 'test-key';
@@ -65,7 +68,13 @@ const password = 'original password';
 const developerEmail = 'session-dev@example.com';
 const adminEmail = 'session-admin@example.com';
 const otherDeveloperEmail = 'session-other-dev@example.com';
-const fixtureEmails = [developerEmail, adminEmail, otherDeveloperEmail];
+const inactiveEmail = 'session-inactive@example.com';
+const fixtureEmails = [
+  developerEmail,
+  adminEmail,
+  otherDeveloperEmail,
+  inactiveEmail,
+];
 
 describe('account sessions (e2e)', () => {
   let app: INestApplication<App>;
@@ -108,6 +117,14 @@ describe('account sessions (e2e)', () => {
           role: 'DEVELOPER',
           emailVerifiedAt: new Date(),
         },
+        {
+          name: 'Dani',
+          email: inactiveEmail,
+          passwordHash,
+          role: 'DEVELOPER',
+          isActive: false,
+          emailVerifiedAt: new Date(),
+        },
       ],
     });
     const developer = await prisma.user.findUniqueOrThrow({
@@ -130,11 +147,11 @@ describe('account sessions (e2e)', () => {
     }
   });
 
-  function login(email: string) {
+  function login(email: string, submittedPassword = password) {
     return request(app.getHttpServer())
       .post('/auth/login')
       .set('Origin', origin)
-      .send({ email, password });
+      .send({ email, password: submittedPassword });
   }
 
   it.each([
@@ -156,6 +173,48 @@ describe('account sessions (e2e)', () => {
         .set('Cookie', cookie)
         .expect(200)
         .expect({ data: profile });
+    },
+  );
+
+  it.each([
+    {
+      scenario: 'unknown email',
+      email: 'session-unknown@example.com',
+      submittedPassword: password,
+    },
+    {
+      scenario: 'wrong password',
+      email: developerEmail,
+      submittedPassword: 'wrong password',
+    },
+    {
+      scenario: 'inactive account',
+      email: inactiveEmail,
+      submittedPassword: password,
+    },
+  ])(
+    'uses the same denial and password derivation for $scenario',
+    async ({ email, submittedPassword }) => {
+      const sessionCount = await prisma.authSession.count();
+      vi.mocked(scrypt).mockClear();
+
+      const response = await login(email, submittedPassword)
+        .expect(401)
+        .expect({
+          statusCode: 401,
+          code: 'HTTP_ERROR',
+          message: 'Não foi possível concluir a solicitação.',
+        });
+
+      expect(response.headers['set-cookie']).toBeUndefined();
+      expect(await prisma.authSession.count()).toBe(sessionCount);
+      expect(scrypt).toHaveBeenCalledExactlyOnceWith(
+        submittedPassword,
+        expect.any(Buffer),
+        64,
+        { N: 16384, r: 8, p: 1, maxmem: 67108864 },
+        expect.any(Function),
+      );
     },
   );
 

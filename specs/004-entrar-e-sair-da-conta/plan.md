@@ -21,7 +21,7 @@
   - Teste primeiro — login HTTP dos dois perfis com contas persistidas e acesso a recurso protegido compatível. Os testes de autorização recusam o perfil incorreto e o acesso a dados de prospecção por administrador ou por outro desenvolvedor. No Vue, credenciais válidas levam à área do perfil e navegação sem sessão volta à tela de entrada. A rota de login e o Guard ainda não existem.
   - Arquivos previstos — módulo, controlador, DTOs, serviços e Guard de `apps/api/src/modules/auth/`, schema e migração Prisma, configuração da API, `apps/api/test/auth-session.e2e-spec.ts`, roteador, cliente HTTP e `apps/web/src/features/auth/` com testes.
 
-- [ ] **Tarefa 3 — Recusar credenciais com mensagem única**
+- [x] **Tarefa 3 — Recusar credenciais com mensagem única**
   - Cobre CA2.
   - Teste primeiro — e-mail inexistente, senha incorreta e conta desativada produzem o mesmo envelope `401`, sem cookie emitido ou sessão persistida. A tela mostra a mesma mensagem para as três respostas. O teste da verificação confirma que a ausência do e-mail ainda passa por uma derivação equivalente.
   - Arquivos previstos — serviço de login e testes em `apps/api/src/modules/auth/`, `apps/api/test/auth-session.e2e-spec.ts`, tela de entrada e seu teste em `apps/web/src/features/auth/`.
