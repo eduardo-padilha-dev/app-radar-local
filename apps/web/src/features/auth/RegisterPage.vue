@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useRegistration } from "./useRegistration";
 import { useVerificationResend } from "./useVerificationResend";
 
 const { fields, errors, state, submit } = useRegistration();
+const resendEmail = ref("");
 const { message: resendMessage, blocked: resendBlocked, resend } = useVerificationResend();
 </script>
 
@@ -93,7 +95,6 @@ const { message: resendMessage, blocked: resendBlocked, resend } = useVerificati
         <p class="guidance">
           * Campos obrigatórios. Cadastro exclusivo para desenvolvedores freelancers.
         </p>
-        <!-- // TODO #3: conectar ao fluxo real de reenvio da confirmação. -->
         <!-- // TODO #4: conectar ao fluxo real de entrada. -->
         <p v-if="state === 'email-already-registered'" class="error" role="alert">
           Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.
@@ -109,6 +110,25 @@ const { message: resendMessage, blocked: resendBlocked, resend } = useVerificati
           {{ state === "submitting" ? "Criando conta…" : "Criar conta" }}
         </button>
       </form>
+      <details v-if="state !== 'success' && state !== 'email-unconfirmed'" class="resend">
+        <summary>Reenviar link de confirmação</summary>
+        <form @submit.prevent="resend(resendEmail)">
+          <label for="resend-email">
+            E-mail
+            <input
+              id="resend-email"
+              v-model="resendEmail"
+              name="email"
+              type="email"
+              autocomplete="email"
+              required
+              :disabled="resendBlocked"
+            />
+          </label>
+          <button type="submit" :disabled="resendBlocked || !resendEmail.trim()">Reenviar</button>
+          <p v-if="resendMessage" class="guidance" role="status">{{ resendMessage }}</p>
+        </form>
+      </details>
       <!-- // TODO #4: conectar ao fluxo real de entrada. -->
       <p class="guidance">Já tem uma conta? A entrada estará disponível em breve.</p>
     </section>
@@ -164,6 +184,13 @@ form {
   flex-direction: column;
   gap: var(--espaco-lg);
 }
+.resend summary {
+  color: var(--primaria);
+  cursor: pointer;
+}
+.resend form {
+  margin-top: var(--espaco-md);
+}
 .fields {
   display: flex;
   flex-direction: column;
@@ -210,7 +237,8 @@ button:disabled {
   cursor: wait;
 }
 input:focus-visible,
-button:focus-visible {
+button:focus-visible,
+summary:focus-visible {
   outline: 2px solid var(--primaria);
   outline-offset: 3px;
 }

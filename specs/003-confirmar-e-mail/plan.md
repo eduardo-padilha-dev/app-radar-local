@@ -42,4 +42,9 @@
   - Teste primeiro: simular rejeição e timeout do provedor, comparar o resultado público e sua janela de resposta com os outros desfechos e comprovar que a confirmação continua pendente. Testar perda de conexão na interface e a restrição durante o intervalo exibido. Com o relógio avançado, repetir, receber o novo link pelo adaptador falso e comprovar que ele funciona. O RED vem do comportamento ausente diante da falha ou da tentativa posterior.
   - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.controller.ts,auth.service.ts}`, `apps/web/src/features/auth/{RegisterPage.vue,RegisterPage.spec.ts,VerifyEmailPage.vue,VerifyEmailPage.spec.ts,useVerificationResend.ts}`.
 
+- [x] **Tarefa 7 — Retomar o reenvio após fechar o cadastro**
+  - Cobre: CA6, no cenário de abandono da spec identificado pela auditoria final, preservando a resposta genérica do CA4.
+  - Teste primeiro: abrir uma nova instância da página de cadastro, sem link nem dados do cadastro anterior. Acionar a opção de reenvio, informar o mesmo endereço e conferir que apenas a rota de reenvio é chamada, com a orientação pública genérica e o intervalo já usado pelas demais telas. O RED vem da ausência de uma opção de reenvio acessível nessa nova visita.
+  - Arquivos previstos: `apps/web/src/features/auth/{RegisterPage.vue,RegisterPage.spec.ts}`.
+
 ## Critérios sem tarefa
