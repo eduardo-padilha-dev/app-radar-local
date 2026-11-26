@@ -1,6 +1,9 @@
 import {
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
   NotFoundException,
   Param,
   Req,
@@ -24,6 +27,7 @@ import {
 } from '../src/modules/auth/auth-session.guard.js';
 import { AuthModule } from '../src/modules/auth/auth.module.js';
 import { PasswordHasher } from '../src/modules/auth/password-hasher.js';
+import { SearchEmailEligibilityService } from '../src/modules/auth/search-email-eligibility.service.js';
 import { requireTestDatabaseUrl } from './setup-database.js';
 
 vi.mock(import('node:crypto'), { spy: true });
@@ -40,6 +44,11 @@ const prospectingResults = new Map<string, { userId: string; name: string }>();
 @Controller('test/private')
 @UseGuards(AuthSessionGuard)
 class PrivateResourcesController {
+  constructor(
+    @Inject(SearchEmailEligibilityService)
+    private readonly searchEmailEligibility: SearchEmailEligibilityService,
+  ) {}
+
   @Get('developer')
   @RequireRole(Role.DEVELOPER)
   developer() {
@@ -50,6 +59,15 @@ class PrivateResourcesController {
   @RequireRole(Role.ADMIN)
   admin() {
     return { area: 'admin' };
+  }
+
+  @Get('search-email-eligibility')
+  @RequireRole(Role.DEVELOPER)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async assertSearchEmailEligibility(@Req() req: AuthenticatedRequest) {
+    await this.searchEmailEligibility.assertEmailVerified(
+      req.authenticatedUser.id,
+    );
   }
 
   @Get('prospecting/:id')
@@ -69,11 +87,13 @@ const developerEmail = 'session-dev@example.com';
 const adminEmail = 'session-admin@example.com';
 const otherDeveloperEmail = 'session-other-dev@example.com';
 const inactiveEmail = 'session-inactive@example.com';
+const pendingEmail = 'session-pending@example.com';
 const fixtureEmails = [
   developerEmail,
   adminEmail,
   otherDeveloperEmail,
   inactiveEmail,
+  pendingEmail,
 ];
 
 describe('account sessions (e2e)', () => {
@@ -124,6 +144,12 @@ describe('account sessions (e2e)', () => {
           role: 'DEVELOPER',
           isActive: false,
           emailVerifiedAt: new Date(),
+        },
+        {
+          name: 'Eli',
+          email: pendingEmail,
+          passwordHash,
+          role: 'DEVELOPER',
         },
       ],
     });
@@ -237,6 +263,37 @@ describe('account sessions (e2e)', () => {
       await privateResource(denied, cookie).expect(403);
     },
   );
+
+  it('allows a pending developer into their private area and requires email verification before search', async () => {
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: pendingEmail },
+    });
+    expect(user.demoUsedAt).toBeNull();
+
+    const cookie = sessionCookie(await login(pendingEmail).expect(200));
+    await privateResource('developer', cookie)
+      .expect(200)
+      .expect({ data: { area: 'developer' } });
+    await privateResource('search-email-eligibility', cookie)
+      .expect(403)
+      .expect({
+        statusCode: 403,
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        message: 'Confirme seu e-mail para fazer buscas.',
+      });
+
+    const pendingUser = await prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { demoUsedAt: true },
+    });
+    expect(pendingUser.demoUsedAt).toBeNull();
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date() },
+    });
+    await privateResource('search-email-eligibility', cookie).expect(204);
+  });
 
   it('allows only the authenticated developer who owns the prospecting result', async () => {
     const cookie = sessionCookie(await login(developerEmail).expect(200));

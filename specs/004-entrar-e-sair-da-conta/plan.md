@@ -26,7 +26,7 @@
   - Teste primeiro — e-mail inexistente, senha incorreta e conta desativada produzem o mesmo envelope `401`, sem cookie emitido ou sessão persistida. A tela mostra a mesma mensagem para as três respostas. O teste da verificação confirma que a ausência do e-mail ainda passa por uma derivação equivalente.
   - Arquivos previstos — serviço de login e testes em `apps/api/src/modules/auth/`, `apps/api/test/auth-session.e2e-spec.ts`, tela de entrada e seu teste em `apps/web/src/features/auth/`.
 
-- [ ] **Tarefa 4 — Aplicar a elegibilidade de busca**
+- [x] **Tarefa 4 — Aplicar a elegibilidade de busca**
   - Cobre CA3.
   - Teste primeiro — uma conta persistida com e-mail pendente entra e alcança a área privada. A regra de elegibilidade recusa a busca para a identidade autenticada e deixa a demonstração intacta. Com e-mail confirmado, a regra permite verificar as demais condições. O teste exige a ligação do contexto autenticado ao serviço da US02.
   - Arquivos previstos — `apps/api/src/modules/auth/search-email-eligibility.service.ts` se a adaptação for necessária e `apps/api/test/auth-session.e2e-spec.ts`.
