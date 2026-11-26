@@ -81,7 +81,9 @@ O cadastro não solicitará CPF.
 
 **Regras relacionadas:** RN01, RN02, RN03.
 
-### US02 — Confirmar e-mail · `Must Have` · `M` · Status: `🟡 Ready`
+<a name="us02--confirmar-e-mail--must-have--m--status--ready"></a>
+
+### US02 — Confirmar e-mail · `Must Have` · `M` · Status: `🟢 Live`
 
 **Como** desenvolvedor, **eu quero** confirmar meu e-mail **para que** eu possa
 liberar o acesso às buscas do Radar Local.
