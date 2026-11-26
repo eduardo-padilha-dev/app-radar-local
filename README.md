@@ -46,43 +46,63 @@ O protótipo e as telas estão em `docs/design-tokens.md`.
 
 Requisitos: Node.js 24.x, npm 11.x e Docker com Compose.
 
-Na raiz, instale as dependências dos dois apps:
+Em um checkout novo, execute na raiz:
 
 ```bash
-npm install
+npm ci
 cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
 ```
 
-Preencha `apps/api/.env` com a conexão local de desenvolvimento:
+Configure `apps/api/.env`:
 
 ```dotenv
-DATABASE_URL="postgresql://app:app@localhost:5433/appdb?schema=public"
+DATABASE_URL="postgresql://app:app@127.0.0.1:5433/appdb?schema=public"
+TEST_DATABASE_URL="postgresql://app:app@127.0.0.1:5433/appdb_test?schema=public"
+RESEND_API_KEY="sua-chave-do-resend"
+EMAIL_FROM="cadastro@seu-dominio.example"
+WEB_URL="http://localhost:5173"
+CORS_ORIGIN="http://localhost:5173"
 ```
 
-Suba o banco e confira a configuração, sem criar tabelas:
+Para enviar o e-mail de confirmação em um cadastro manual, substitua os exemplos
+de `RESEND_API_KEY` e `EMAIL_FROM` por uma chave do Resend e um remetente
+autorizado. Guarde a chave apenas no `.env` da API.
+
+Configure `apps/web/.env`:
+
+```dotenv
+VITE_API_URL="http://localhost:3000"
+```
+
+Suba o PostgreSQL e aguarde o banco aceitar conexões. A porta 5433 é a porta
+local. Dentro do contêiner, o PostgreSQL usa a porta 5432.
 
 ```bash
 docker compose up -d
-npm exec -w apps/api -- prisma validate
-docker compose exec db psql -U app -d appdb -c '\dt'
+docker compose exec db pg_isready -U app -d appdb
+npm exec -w apps/api -- prisma migrate deploy
+npm exec -w apps/api -- prisma generate
 ```
 
-A resposta esperada do banco é `Did not find any relations.` A porta 5433 evita
-conflito com outro PostgreSQL na máquina; dentro do container, a porta é 5432.
-`prisma validate` verifica a configuração, mas ainda não prova a conexão do Prisma.
-Não rode migrations nesta atividade.
+Em terminais separados, partindo da raiz, execute `npm run api` e `npm run web`.
+Abra o [cadastro](http://localhost:5173/criar-conta). A API atende em
+<http://localhost:3000>. Use `Ctrl+C` para parar cada servidor.
+`npm start` inicia a API sem watch.
 
-Em terminais separados, partindo da raiz:
+### Testes locais
+
+Com o PostgreSQL ativo, crie o banco separado uma vez por volume do Docker:
 
 ```bash
-npm run api
-npm run web
+docker compose exec db createdb -U app appdb_test
 ```
 
-API: <http://localhost:3000>, com `Hello World!`. Frontend: <http://localhost:5173>.
-Use `Ctrl+C` para parar cada servidor. `npm start` inicia a API sem watch.
+A suíte de integração usa `TEST_DATABASE_URL` e aplica as migrations ao banco de
+teste. O nome desse banco deve terminar em `_test`. Os testes de cadastro simulam
+o envio de e-mail.
 
-Verificações na raiz:
+Execute na raiz:
 
 ```bash
 npm test

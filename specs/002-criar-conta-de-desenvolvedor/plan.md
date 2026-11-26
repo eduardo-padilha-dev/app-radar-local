@@ -117,4 +117,14 @@
   - Teste primeiro: HTTP parametrizado envia `role`, `isActive`, `emailVerifiedAt`, `demoUsedAt` e `accessExpiresAt`, além de propriedade desconhecida, em cadastros de resto válidos. Exigir HTTP 400, nenhuma conta/token persistido e nenhum envio; a chamada pública legítima continua funcionando. Os testes falham se campos extras forem aceitos ou ignorados silenciosamente.
   - Arquivos previstos: `apps/api/test/registration.e2e-spec.ts`, `apps/api/src/modules/auth/{dto/register.dto.ts,auth.service.ts}`, `apps/api/src/common/configure-app.ts`.
 
+- [x] **Tarefa 10 — Atualizar as instruções de execução local da US01**
+  - Cobre: pendência 1 da auditoria final.
+  - Validação: conferir os comandos de configuração da API, do frontend e do banco de testes e executar as verificações locais aplicáveis.
+  - Arquivo previsto: `README.md`.
+
+- [ ] **Tarefa 11 — Preservar o link da issue #2 para a US01 no PRD**
+  - Cobre: pendência 2 da auditoria final.
+  - Validação: verificar se o fragmento usado pela issue #2 tem um destino explícito na seção da US01, independente do status no título.
+  - Arquivo previsto: `docs/prd.md`.
+
 ## Critérios sem tarefa
