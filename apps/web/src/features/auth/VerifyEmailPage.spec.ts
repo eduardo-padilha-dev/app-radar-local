@@ -38,6 +38,8 @@ it("confirms the email when the user opens the registration link", async () => {
     await flushPromises();
 
     expect(page.get("[role=status]").text()).toBe("E-mail confirmado");
+    expect(page.get("header img").attributes("alt")).toBe("");
+    expect(page.get('a[href="/entrar"]').text()).toBe("Entrar na conta");
     expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
       expect.stringMatching(/\/auth\/verify-email$/),
       expect.objectContaining({

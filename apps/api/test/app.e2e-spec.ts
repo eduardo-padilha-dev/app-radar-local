@@ -177,6 +177,7 @@ describe('AppController (e2e)', () => {
 describe('required environment', () => {
   const valid = {
     DATABASE_URL: 'postgresql://app:app@localhost/appdb_test',
+    JWT_SECRET: 'fictitious secret for configuration validation',
     RESEND_API_KEY: 'test-key',
     EMAIL_FROM: 'hello@example.com',
     WEB_URL: 'https://web.example',

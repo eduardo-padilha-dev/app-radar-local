@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, Length, Matches, ValidateIf } from 'class-validator';
+import { normalizeEmail } from './normalize-email.js';
 
 export class RegisterDto {
   @ApiProperty({ example: 'Ana', minLength: 2, maxLength: 100 })
@@ -11,9 +12,7 @@ export class RegisterDto {
   name: string;
 
   @ApiProperty({ example: 'ana@example.com', format: 'email' })
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().toLowerCase() : value,
-  )
+  @Transform(normalizeEmail)
   @IsEmail({}, { message: 'Informe um e-mail válido.' })
   email: string;
 

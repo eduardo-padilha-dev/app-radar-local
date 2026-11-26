@@ -62,10 +62,19 @@ Configure `apps/api/.env`:
 ```dotenv
 DATABASE_URL="postgresql://app:app@127.0.0.1:5433/appdb?schema=public"
 TEST_DATABASE_URL="postgresql://app:app@127.0.0.1:5433/appdb_test?schema=public"
+JWT_SECRET=""
 RESEND_API_KEY="sua-chave-do-resend"
 EMAIL_FROM="cadastro@seu-dominio.example"
 WEB_URL="http://localhost:5173"
 CORS_ORIGIN="http://localhost:5173"
+```
+
+Gere uma chave de sessão para o ambiente local e copie o resultado para
+`JWT_SECRET` no `apps/api/.env` antes de iniciar a API. Guarde a chave apenas
+nesse arquivo.
+
+```bash
+node -e 'console.log(require("node:crypto").randomBytes(32).toString("hex"))'
 ```
 
 Para enviar o e-mail de confirmação em um cadastro manual, substitua os exemplos

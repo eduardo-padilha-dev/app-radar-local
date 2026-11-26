@@ -25,8 +25,10 @@ describe("registration page", () => {
       { status },
     ));
     vi.stubGlobal("fetch", fetchMock);
-    const page = mount(RegisterPage);
+    const page = mount(RegisterPage, { global: { stubs: { RouterLink: true } } });
     try {
+      expect(page.get("header img").attributes("alt")).toBe("");
+      expect(page.get("h1").text()).toBe("Crie sua conta");
       await page.get("#name").setValue("Ana");
       await page.get("#email").setValue("ana@example.com");
       await page.get("#password").setValue("same password");
@@ -46,16 +48,14 @@ describe("registration page", () => {
     }
   });
 
-  it("requests a new link on the registration page using the email already entered", async () => {
+  it("shows the submitted email and requests a new link after an unconfirmed delivery", async () => {
     const email = "Ana@example.com";
+    let resolveRegistration!: (value: Response) => void;
+    const registrationResponse = new Promise<Response>((resolve) => {
+      resolveRegistration = resolve;
+    });
     const fetchMock = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(new Response(
-        JSON.stringify({
-          code: "VERIFICATION_EMAIL_UNCONFIRMED",
-          details: { accountCreated: true, emailVerificationPending: true },
-        }),
-        { status: 502 },
-      ))
+      .mockReturnValueOnce(registrationResponse)
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ data: { retryAfterSeconds: 60 } }), { status: 202 }),
       );
@@ -73,7 +73,16 @@ describe("registration page", () => {
       await page.get("#email").setValue(email);
       await page.get("#password").setValue("same password");
       await page.get("form[novalidate]").trigger("submit");
+      await page.get("#email").setValue("outro@example.com");
+      resolveRegistration(new Response(
+        JSON.stringify({
+          code: "VERIFICATION_EMAIL_UNCONFIRMED",
+          details: { accountCreated: true, emailVerificationPending: true },
+        }),
+        { status: 502 },
+      ));
       await flushPromises();
+      expect(page.get(".access-intro").text()).toBe(email);
 
       const resend = page.get("button");
       expect(resend.text()).toBe("Reenviar link de confirmação");
@@ -157,7 +166,7 @@ describe("registration page", () => {
         new Response(JSON.stringify({ data: { retryAfterSeconds: 60 } }), { status: 202 }),
       );
     vi.stubGlobal("fetch", fetchMock);
-    const page = mount(RegisterPage);
+    const page = mount(RegisterPage, { global: { stubs: { RouterLink: true } } });
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
       await page.get("#name").setValue("Ana");
@@ -228,7 +237,7 @@ describe("registration page", () => {
         return new Response(body, { status: 201 });
       });
       vi.stubGlobal("fetch", fetchMock);
-      const page = mount(RegisterPage);
+      const page = mount(RegisterPage, { global: { stubs: { RouterLink: true } } });
       try {
         for (const [field, value] of Object.entries(input)) {
           await page.get(`#${field}`).setValue(value);
@@ -275,7 +284,7 @@ describe("registration page", () => {
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
-    const page = mount(RegisterPage);
+    const page = mount(RegisterPage, { global: { stubs: { RouterLink: true } } });
     await page.get("#name").setValue("Ana");
     await page.get("#email").setValue("ana@example.com");
     await page.get("#password").setValue("same password");
@@ -309,7 +318,10 @@ describe("registration page", () => {
         { status: 201 },
       ));
     vi.stubGlobal("fetch", fetchMock);
-    const page = mount(RegisterPage, { attachTo: document.body });
+    const page = mount(RegisterPage, {
+      attachTo: document.body,
+      global: { stubs: { RouterLink: true } },
+    });
     const values = {
       name: "",
       email: "email-invalido",
@@ -444,6 +456,7 @@ describe("registration page", () => {
         body: JSON.stringify({ name: "Ana", email: "ana@example.com", password: "same password" }),
       }),
     ]);
+    await page.get("#email").setValue("outro@example.com");
     accept(
       new Response(
         JSON.stringify({ data: { accountCreated: true, verificationEmailStatus: "accepted" } }),
@@ -454,9 +467,11 @@ describe("registration page", () => {
     expect(page.get("[role=status]").text()).toBe(
       "Conta criada. Confira seu e-mail para confirmar o cadastro.",
     );
+    expect(page.get(".access-intro").text()).toBe("Enviamos um link para ana@example.com.");
     expect(router.currentRoute.value.path).toBe("/criar-conta");
     expect(storage).not.toHaveBeenCalled();
-    expect(page.findAll("a, button")).toHaveLength(0);
+    expect(page.get('a[href="/entrar"]').text()).toBe("Voltar para entrar");
+    expect(page.get("button").text()).toBe("Reenviar link de confirmação");
     page.unmount();
     storage.mockRestore();
   });
