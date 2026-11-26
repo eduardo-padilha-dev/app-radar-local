@@ -2,13 +2,13 @@ import { ref } from "vue";
 import { verifyEmail } from "./email-verification.service";
 
 export function useEmailVerification() {
-  const state = ref<"idle" | "confirming" | "confirmed" | "failed">("idle");
+  const state = ref<"idle" | "confirming" | "confirmed" | "invalid" | "expired" | "failed">("idle");
 
   async function confirm(token: unknown) {
     if (state.value === "confirming") return;
 
     if (typeof token !== "string") {
-      state.value = "failed";
+      state.value = "invalid";
       return;
     }
 

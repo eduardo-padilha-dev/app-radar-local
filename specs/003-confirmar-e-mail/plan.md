@@ -17,10 +17,10 @@
   - Teste primeiro: emitir um link pelo cadastro e abri-lo pela rota real com a API de teste ou transporte controlado no teste de interface. O teste HTTP deve confirmar o e-mail, marcar o token como usado na mesma operação, preservar o estado da demonstração e comprovar que a resposta não inicia sessão. Simular falha de gravação para verificar que as duas alterações são revertidas juntas. O teste de interface deve mostrar “E-mail confirmado”. O RED vem da ausência da rota, da operação e da página.
   - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.controller.ts,auth.service.ts,verification-token.ts,dto/verify-email.dto.ts,dto/email-verification-result.dto.ts}`, `apps/web/src/app/router/index.ts`, `apps/web/src/features/auth/{VerifyEmailPage.vue,VerifyEmailPage.spec.ts,email-verification.service.ts,useEmailVerification.ts}`, `apps/web/index.html`, `apps/web/vite.config.ts`.
 
-- [ ] **Tarefa 2 — Informar por que o link não pode ser usado**
+- [x] **Tarefa 2 — Informar por que o link não pode ser usado**
   - Cobre: CA2.
   - Teste primeiro: testar token ausente, malformado, desconhecido, associado a outro endereço e exatamente no limite de 24 horas. Verificar respostas distintas para expiração e invalidade, sem mudar o estado persistido. A interface deve distinguir os resultados e exibir a opção de reenvio para o expirado. A emissão real pelo botão entra na tarefa 5. O RED vem das respostas ou estados ainda ausentes.
-  - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.controller.ts,auth.service.ts,dto/verify-email.dto.ts}`, `apps/api/src/common/api-exception.filter.ts`, `apps/web/src/features/auth/{VerifyEmailPage.vue,VerifyEmailPage.spec.ts,email-verification.service.ts}`.
+  - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.controller.ts,auth.service.ts,dto/verify-email.dto.ts}`, `apps/api/src/common/api-exception.filter.ts`, `apps/web/src/features/auth/{VerifyEmailPage.vue,VerifyEmailPage.spec.ts,email-verification.service.ts,useEmailVerification.ts}`.
 
 - [ ] **Tarefa 3 — Recusar busca com e-mail pendente**
   - Cobre: CA3.

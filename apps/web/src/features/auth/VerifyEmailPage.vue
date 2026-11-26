@@ -18,6 +18,22 @@ onMounted(() => confirm(route.query.token));
       <h1 id="verification-title">Confirmação de e-mail</h1>
       <p v-if="state === 'idle' || state === 'confirming'" role="status">Confirmando seu e-mail…</p>
       <p v-else-if="state === 'confirmed'" class="success" role="status">E-mail confirmado</p>
+      <p v-else-if="state === 'invalid'" class="error" role="alert">
+        O link de confirmação é inválido.
+      </p>
+      <template v-else-if="state === 'expired'">
+        <p class="error" role="alert">O link de confirmação expirou.</p>
+        <details class="resend">
+          <summary>Reenviar link de confirmação</summary>
+          <!-- TODO #3: conectar o envio do formulário na tarefa 5. -->
+          <form @submit.prevent>
+            <p>O reenvio estará disponível em breve.</p>
+            <label for="resend-email">E-mail</label>
+            <input id="resend-email" type="email" name="email" autocomplete="email" disabled />
+            <button type="submit" disabled>Reenviar</button>
+          </form>
+        </details>
+      </template>
       <p v-else class="error" role="alert">Não foi possível confirmar o e-mail.</p>
     </section>
   </main>
@@ -59,6 +75,32 @@ h1 {
 }
 .error {
   color: var(--perigo);
+}
+.resend {
+  margin-top: var(--espaco-md);
+}
+.resend summary {
+  color: var(--primaria);
+  cursor: pointer;
+}
+.resend summary:focus-visible {
+  outline: 2px solid var(--primaria);
+  outline-offset: 3px;
+}
+.resend form {
+  margin-top: var(--espaco-md);
+  display: grid;
+  gap: var(--espaco-sm);
+}
+.resend input,
+.resend button {
+  min-height: 2.5rem;
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: 1px solid var(--desabilitado);
+  border-radius: 0.25rem;
+  background: var(--desabilitado);
+  color: var(--texto-suave);
+  font: inherit;
 }
 @media (max-width: 40rem) {
   .access-header,

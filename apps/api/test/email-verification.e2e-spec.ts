@@ -99,6 +99,118 @@ describe('email verification', () => {
     ).toEqual({ ...verification, usedAt: confirmedAt });
   });
 
+  it.each([
+    ['missing', {}],
+    ['malformed', { token: 'not-a-verification-token' }],
+    ['unknown', { token: 'A'.repeat(43) }],
+  ])('rejects the %s token as invalid without changing the account or link', async (_case, body) => {
+    const { user, verification } = await registerAndReadState();
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send(body)
+      .expect(400, {
+        statusCode: 400,
+        code: 'VERIFICATION_LINK_INVALID',
+        message: 'O link de confirmação é inválido.',
+      });
+
+    await expectUnchangedState(user, verification);
+  });
+
+  it('rejects a token issued for a different email address as invalid', async () => {
+    const { token, user, verification } = await registerAndReadState();
+    const currentUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { email: 'verify-' + randomUUID() + '@example.com' },
+    });
+
+    try {
+      await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ token })
+        .expect(400, {
+          statusCode: 400,
+          code: 'VERIFICATION_LINK_INVALID',
+          message: 'O link de confirmação é inválido.',
+        });
+
+      await expectUnchangedState(currentUser, verification);
+    } finally {
+      await prisma.user.update({ where: { id: user.id }, data: { email } });
+    }
+  });
+
+  it('rejects a link as expired at exactly 24 hours without changing the account or link', async () => {
+    const issuedAt = new Date('2026-11-10T00:00:00.000Z');
+    const expiresAt = new Date('2026-11-11T00:00:00.000Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(issuedAt.getTime());
+    const { token, user, verification } = await registerAndReadState();
+    expect(verification.expiresAt).toEqual(expiresAt);
+
+    clock.mockReturnValue(expiresAt.getTime());
+    await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send({ token })
+      .expect(410, {
+        statusCode: 410,
+        code: 'VERIFICATION_LINK_EXPIRED',
+        message: 'O link de confirmação expirou.',
+      });
+
+    await expectUnchangedState(user, verification);
+  });
+
+  it('documents invalid and expired link errors in OpenAPI', async () => {
+    const { body } = await request(app.getHttpServer())
+      .get('/docs-json')
+      .expect(200);
+
+    expect(body.paths['/auth/verify-email'].post.responses).toMatchObject({
+      400: {
+        content: {
+          'application/json': {
+            schema: {
+              properties: {
+                code: { enum: expect.arrayContaining(['VERIFICATION_LINK_INVALID']) },
+              },
+            },
+          },
+        },
+      },
+      410: {
+        content: {
+          'application/json': {
+            schema: {
+              properties: {
+                code: { enum: ['VERIFICATION_LINK_EXPIRED'] },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  async function registerAndReadState() {
+    const token = await registerAndReadLink();
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const verification = await prisma.emailVerification.findFirstOrThrow({
+      where: { userId: user.id },
+    });
+    return { token, user, verification };
+  }
+
+  async function expectUnchangedState(
+    user: Awaited<ReturnType<typeof registerAndReadState>>['user'],
+    verification: Awaited<ReturnType<typeof registerAndReadState>>['verification'],
+  ) {
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: user.id } }))
+      .toEqual(user);
+    expect(await prisma.emailVerification.findUniqueOrThrow({ where: { id: verification.id } }))
+      .toEqual(verification);
+  }
+
   it('rolls back both updates if the database refuses to mark the link as used', async () => {
     email = 'verify-rollback@example.com';
     const token = await registerAndReadLink();

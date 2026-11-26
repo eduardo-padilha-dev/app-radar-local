@@ -1,6 +1,7 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../../../generated/prisma/client.js';
+import { PublicApiException } from '../../common/api-exception.filter.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { ResendEmailService } from '../../integrations/resend/resend-email.service.js';
 import { PasswordHasher } from './password-hasher.js';
@@ -9,6 +10,16 @@ import { VerificationToken } from './verification-token.js';
 import type { EmailVerificationResult } from './dto/email-verification-result.dto.js';
 import type { RegisterDto } from './dto/register.dto.js';
 import type { RegistrationResult } from './dto/registration-result.dto.js';
+
+export const invalidVerificationLink = {
+  code: 'VERIFICATION_LINK_INVALID',
+  message: 'O link de confirmação é inválido.',
+} as const;
+
+export const expiredVerificationLink = {
+  code: 'VERIFICATION_LINK_EXPIRED',
+  message: 'O link de confirmação expirou.',
+} as const;
 
 @Injectable()
 export class AuthService {
@@ -82,7 +93,12 @@ export class AuthService {
         where: { tokenHash },
         select: { userId: true },
       });
-      if (!candidate) throw new NotFoundException();
+      if (!candidate) {
+        throw new PublicApiException(
+          invalidVerificationLink,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
 
       // Lock the account before reading the state shared by confirmation and issuance.
       await tx.$queryRaw`
@@ -93,15 +109,21 @@ export class AuthService {
         where: { tokenHash, userId: candidate.userId },
         include: { user: { select: { email: true, emailVerifiedAt: true } } },
       });
-      const now = new Date(Date.now());
       if (
         !verification ||
         verification.email !== verification.user.email ||
         verification.usedAt !== null ||
-        verification.user.emailVerifiedAt !== null ||
-        verification.expiresAt <= now
+        verification.user.emailVerifiedAt !== null
       ) {
-        throw new NotFoundException();
+        throw new PublicApiException(
+          invalidVerificationLink,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const now = new Date(Date.now());
+      if (verification.expiresAt <= now) {
+        throw new PublicApiException(expiredVerificationLink, HttpStatus.GONE);
       }
 
       await tx.user.update({

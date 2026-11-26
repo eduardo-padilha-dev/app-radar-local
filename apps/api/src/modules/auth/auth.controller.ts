@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Inject,
   Post,
+  UseFilters,
 } from '@nestjs/common';
 import {
   ApiBadGatewayResponse,
@@ -13,11 +14,17 @@ import {
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiExtraModels,
+  ApiGoneResponse,
   ApiOkResponse,
   ApiTags,
   getSchemaPath,
 } from '@nestjs/swagger';
-import { AuthService } from './auth.service.js';
+import { ApiExceptionFilter } from '../../common/api-exception.filter.js';
+import {
+  AuthService,
+  expiredVerificationLink,
+  invalidVerificationLink,
+} from './auth.service.js';
 import { EmailVerificationResult } from './dto/email-verification-result.dto.js';
 import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
@@ -103,6 +110,38 @@ export class AuthController {
   }
 
   @Post('verify-email')
+  @UseFilters(
+    new ApiExceptionFilter(({ token }) =>
+      token ? invalidVerificationLink : undefined,
+    ),
+  )
+  @ApiBadRequestResponse({
+    description: 'Link inválido ou corpo da solicitação inválido.',
+    schema: {
+      type: 'object',
+      required: ['statusCode', 'code', 'message'],
+      properties: {
+        statusCode: { type: 'integer', enum: [400] },
+        code: {
+          type: 'string',
+          enum: [invalidVerificationLink.code, 'VALIDATION_ERROR'],
+        },
+        message: { type: 'string' },
+      },
+    },
+  })
+  @ApiGoneResponse({
+    description: 'Link expirado.',
+    schema: {
+      type: 'object',
+      required: ['statusCode', 'code', 'message'],
+      properties: {
+        statusCode: { type: 'integer', enum: [410] },
+        code: { type: 'string', enum: [expiredVerificationLink.code] },
+        message: { type: 'string' },
+      },
+    },
+  })
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: VerifyEmailDto })
   @ApiExtraModels(EmailVerificationResult)

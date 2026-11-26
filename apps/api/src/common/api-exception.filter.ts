@@ -25,6 +25,11 @@ export class PublicApiException extends HttpException {
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
+  constructor(
+    private readonly mapValidationError?: (
+      details: Record<string, string[]>,
+    ) => PublicApiError | undefined,
+  ) {}
   catch(exception: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<Response>();
     const statusCode =
@@ -72,6 +77,11 @@ export class ApiExceptionFilter implements ExceptionFilter {
             messages[0] !== `property ${field} should not exist`,
         );
         if (fields.length) details = Object.fromEntries(fields);
+      }
+      const validationError = details && this.mapValidationError?.(details);
+      if (validationError) {
+        response.status(statusCode).json({ statusCode, ...validationError });
+        return;
       }
     }
     response.status(statusCode).json({

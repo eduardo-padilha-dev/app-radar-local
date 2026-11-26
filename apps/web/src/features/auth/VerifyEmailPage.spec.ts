@@ -51,3 +51,62 @@ it("confirms the email when the user opens the registration link", async () => {
     page.unmount();
   }
 });
+
+it("identifies a missing token as invalid without contacting the API", async () => {
+  const fetchMock = vi.fn<typeof fetch>();
+  vi.stubGlobal("fetch", fetchMock);
+  const page = await openVerificationPage("/confirmar-email");
+  try {
+    expect(page.get("[role=alert]").text()).toBe("O link de confirmação é inválido.");
+    expect(page.text()).not.toContain("Reenviar link de confirmação");
+    expect(fetchMock).not.toHaveBeenCalled();
+  } finally {
+    page.unmount();
+  }
+});
+
+it("identifies an invalid link reported by the API", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>().mockImplementation(async () => {
+      return new Response(JSON.stringify({ code: "VERIFICATION_LINK_INVALID" }), { status: 400 });
+    }),
+  );
+  const page = await openVerificationPage("/confirmar-email?token=invalid");
+  try {
+    expect(page.get("[role=alert]").text()).toBe("O link de confirmação é inválido.");
+    expect(page.text()).not.toContain("Reenviar link de confirmação");
+  } finally {
+    page.unmount();
+  }
+});
+
+it("identifies an expired link and offers resend with an email field", async () => {
+  const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => {
+    return new Response(JSON.stringify({ code: "VERIFICATION_LINK_EXPIRED" }), { status: 410 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const page = await openVerificationPage("/confirmar-email?token=" + "A".repeat(43));
+  try {
+    expect(page.get("[role=alert]").text()).toBe("O link de confirmação expirou.");
+    expect(page.get("summary").text()).toBe("Reenviar link de confirmação");
+    expect(page.get("label").text()).toBe("E-mail");
+    expect(page.get("button[type=submit]").attributes()).toHaveProperty("disabled");
+    expect(page.get("input").attributes("type")).toBe("email");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  } finally {
+    page.unmount();
+  }
+});
+
+async function openVerificationPage(path: string) {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: existingRouter.options.routes,
+  });
+  await router.push(path);
+  await router.isReady();
+  const page = mount(App, { global: { plugins: [router] } });
+  await flushPromises();
+  return page;
+}
