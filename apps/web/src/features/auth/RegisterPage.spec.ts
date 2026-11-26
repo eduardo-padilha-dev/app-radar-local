@@ -199,6 +199,55 @@ describe("registration page", () => {
     page.unmount();
   });
 
+  it("discards an unsubmitted registration when the page is opened again", async () => {
+    const draft = {
+      name: "Ana",
+      email: "ana@example.com",
+      password: "same password",
+      phone: "(42) 91234-5678",
+    };
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    const storageWrite = vi.spyOn(Storage.prototype, "setItem");
+
+    async function visitRegistration() {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: existingRouter.options.routes,
+      });
+      await router.push("/criar-conta");
+      await router.isReady();
+      return mount(App, { global: { plugins: [router] } });
+    }
+
+    try {
+      const firstVisit = await visitRegistration();
+      try {
+        for (const [field, value] of Object.entries(draft)) {
+          await firstVisit.get(`#${field}`).setValue(value);
+        }
+        await flushPromises();
+      } finally {
+        firstVisit.unmount();
+      }
+
+      const nextVisit = await visitRegistration();
+      try {
+        await flushPromises();
+        for (const field of Object.keys(draft)) {
+          expect(nextVisit.get<HTMLInputElement>(`#${field}`).element.value).toBe("");
+        }
+      } finally {
+        nextVisit.unmount();
+      }
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(storageWrite).not.toHaveBeenCalled();
+    } finally {
+      storageWrite.mockRestore();
+    }
+  });
+
   it("submits through the real page and HTTP client, blocks repeat submission and reports CA1 without starting a session", async () => {
     let accept!: (value: Response) => void;
     const fetchMock = vi.fn<typeof fetch>(

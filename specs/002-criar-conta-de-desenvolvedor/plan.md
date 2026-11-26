@@ -107,7 +107,7 @@
   - Teste primeiro: integração HTTP conclui a primeira criação e descarta sua resposta, repetindo a solicitação para provar uma única conta, um único envio e conflito sem alteração dos dados. No teste de UI, a camada de transporte perde a primeira resposta após o servidor simulado registrar a conta; a tela permite tentar novamente, sem afirmar o resultado desconhecido, e exibe CA4 ao receber o conflito na repetição. Os testes falham enquanto a falha de transporte impedir recuperação ou induzir outra criação.
   - Arquivos previstos: `apps/api/test/registration.e2e-spec.ts`, `apps/api/src/modules/auth/auth.service.ts`, `apps/web/src/features/auth/{RegisterPage.spec.ts,RegisterPage.vue,useRegistration.ts,registration.service.spec.ts,registration.service.ts}`, `apps/web/src/shared/http/{client.spec.ts,client.ts}`.
 
-- [ ] **Tarefa 8 — Descartar formulário abandonado antes do envio**
+- [x] **Tarefa 8 — Descartar formulário abandonado antes do envio**
   - Cobre: CA7.
   - Teste primeiro: preencher a página sem submeter, desmontar e criar uma nova instância com estado de aplicação novo, representando nova visita/recarregamento. Conferir campos iniciais vazios, nenhuma chamada HTTP e ausência de escrita em armazenamento persistente. O teste falha se o formulário disparar cadastro automaticamente ou restaurar estado persistido. Não simular preenchimento automático do navegador como comportamento da aplicação.
   - Arquivos previstos: `apps/web/src/features/auth/{RegisterPage.spec.ts,RegisterPage.vue,useRegistration.ts}`.
