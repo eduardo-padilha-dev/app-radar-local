@@ -63,7 +63,7 @@ história pequena e `M`, algumas tarefas. São estimativas iniciais a revisar
 antes da implementação. O aluno promove a `🟡 Ready`; `🟢 Live` somente após
 PR mesclado. Os critérios descrevem comportamento esperado, ainda não entregue.
 
-### US01 — Criar conta de desenvolvedor · `Must Have` · `S` · Status: `🟡 Ready`
+### US01 — Criar conta de desenvolvedor · `Must Have` · `S` · Status: `🟢 Live`
 
 **Como** desenvolvedor freelancer, **eu quero** criar minha conta **para que**
 eu possa experimentar o Radar Local e contratar seu acesso.

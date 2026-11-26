@@ -430,10 +430,9 @@ integral. Qualquer mudança de stack ou entidades exige atualização explícita
 
 ## 🗺️ 6. Mapa de Domínios
 
-Índice reservado; cresce a partir da primeira história implementada.
-
 | Domínio | Módulo (pasta) | Guard | Dados (repository) | US |
 | :--- | :--- | :--- | :--- | :--- |
+| Cadastro de desenvolvedor | `AuthModule` (`apps/api/src/modules/auth/`) | Rota pública | `PrismaService` (`User`, `EmailVerification`) | US01 |
 
 ## 📅 7. Histórico
 

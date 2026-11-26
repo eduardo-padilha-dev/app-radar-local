@@ -2,6 +2,6 @@
 
 | Issue | Spec | Estado | Observação |
 | --- | --- | --- | --- |
-| #2 | [Criar conta de desenvolvedor](002-criar-conta-de-desenvolvedor/spec.md) | aprovada | US01; aguardando leitura e aprovação do aluno. |
+| #2 | [Criar conta de desenvolvedor](002-criar-conta-de-desenvolvedor/spec.md) | implementada | US01 |
 
 Estados: `rascunho` · `aprovada` · `implementada` · `bloqueada`
