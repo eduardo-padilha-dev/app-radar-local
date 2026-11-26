@@ -112,7 +112,7 @@
   - Teste primeiro: preencher a página sem submeter, desmontar e criar uma nova instância com estado de aplicação novo, representando nova visita/recarregamento. Conferir campos iniciais vazios, nenhuma chamada HTTP e ausência de escrita em armazenamento persistente. O teste falha se o formulário disparar cadastro automaticamente ou restaurar estado persistido. Não simular preenchimento automático do navegador como comportamento da aplicação.
   - Arquivos previstos: `apps/web/src/features/auth/{RegisterPage.spec.ts,RegisterPage.vue,useRegistration.ts}`.
 
-- [ ] **Tarefa 9 — Rejeitar privilégios enviados no cadastro público**
+- [x] **Tarefa 9 — Rejeitar privilégios enviados no cadastro público**
   - Cobre: CA8.
   - Teste primeiro: HTTP parametrizado envia `role`, `isActive`, `emailVerifiedAt`, `demoUsedAt` e `accessExpiresAt`, além de propriedade desconhecida, em cadastros de resto válidos. Exigir HTTP 400, nenhuma conta/token persistido e nenhum envio; a chamada pública legítima continua funcionando. Os testes falham se campos extras forem aceitos ou ignorados silenciosamente.
   - Arquivos previstos: `apps/api/test/registration.e2e-spec.ts`, `apps/api/src/modules/auth/{dto/register.dto.ts,auth.service.ts}`, `apps/api/src/common/configure-app.ts`.

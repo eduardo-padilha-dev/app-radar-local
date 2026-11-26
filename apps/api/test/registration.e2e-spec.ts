@@ -242,6 +242,31 @@ describe('public registration', () => {
     password: 'same password',
   };
 
+  it.each([
+    { field: 'role', value: 'ADMIN' },
+    { field: 'isActive', value: false },
+    { field: 'emailVerifiedAt', value: '2026-11-10T15:30:00.000Z' },
+    { field: 'demoUsedAt', value: '2026-11-10T15:30:00.000Z' },
+    { field: 'accessExpiresAt', value: '2027-11-10T15:30:00.000Z' },
+    { field: 'unknownProperty', value: 'unexpected' },
+  ])(
+    'rejects the extra field $field without creating an account or sending email',
+    async ({ field, value }) => {
+      const response = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ ...validRegistration, [field]: value })
+        .expect(400);
+
+      expect(response.body).toMatchObject({
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+      });
+      expect(await prisma.user.count()).toBe(0);
+      expect(await prisma.emailVerification.count()).toBe(0);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
   const emailConflict = {
     statusCode: 409,
     code: 'EMAIL_ALREADY_REGISTERED',
