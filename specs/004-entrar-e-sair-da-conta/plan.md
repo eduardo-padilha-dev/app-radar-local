@@ -16,7 +16,7 @@
   - Teste primeiro — um hash já emitido pelo cadastro aceita a senha original e recusa senha errada ou hash inválido. Hoje o hasher oferece apenas geração.
   - Arquivos previstos — `apps/api/src/modules/auth/password-hasher.ts` e `password-hasher.spec.ts`.
 
-- [ ] **Tarefa 2 — Entrar na área privada**
+- [x] **Tarefa 2 — Entrar na área privada**
   - Cobre CA1.
   - Teste primeiro — login HTTP dos dois perfis com contas persistidas e acesso a recurso protegido compatível. Os testes de autorização recusam o perfil incorreto e o acesso a dados de prospecção por administrador ou por outro desenvolvedor. No Vue, credenciais válidas levam à área do perfil e navegação sem sessão volta à tela de entrada. A rota de login e o Guard ainda não existem.
   - Arquivos previstos — módulo, controlador, DTOs, serviços e Guard de `apps/api/src/modules/auth/`, schema e migração Prisma, configuração da API, `apps/api/test/auth-session.e2e-spec.ts`, roteador, cliente HTTP e `apps/web/src/features/auth/` com testes.

@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { config } from 'dotenv';
 
@@ -24,6 +25,7 @@ export default function setupDatabase() {
   config({ path: `${root}.env`, quiet: true });
   const url = requireTestDatabaseUrl(process.env.TEST_DATABASE_URL);
   process.env.DATABASE_URL = url;
+  process.env.JWT_SECRET = randomBytes(32).toString('hex');
   execFileSync(
     process.execPath,
     [

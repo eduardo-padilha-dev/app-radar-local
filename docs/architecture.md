@@ -113,9 +113,10 @@ Fontes: [NestJS 12](https://docs.nestjs.com/migration-guide),
 - **Privacidade — RNF01:** consultas de histórico e acompanhamento delimitadas
   pelo proprietário autenticado, nunca por um proprietário informado pelo cliente.
   ADMIN não possui acesso universal: não consulta prospecção privada.
-- **Sessão — adiado para US03:** transporte e armazenamento do JWT, duração,
-  logout e eventual revogação serão aprovados na spec antes de implementar.
-  Devem cumprir logout e bloqueio de conta desativada previstos no PRD.
+- **Sessão — US03:** a entrada entrega o JWT em cookie `HttpOnly` e persiste
+  a sessão por oito horas. A cada acesso privado, o Guard valida o JWT, a
+  sessão persistida e o estado atual da conta. O encerramento por logout e a
+  revogação na desativação seguem os critérios da US03.
 - **Senhas e tokens:** guardar hashes, sem texto original. Proposta técnica para
   ratificação na leitura: `node:crypto`, com `scrypt` e salt para senhas, geração
   aleatória e hash para confirmação, evitando biblioteca extra. Parâmetros e
@@ -278,6 +279,7 @@ explícita na cobrança. Campos opcionais anuláveis. Enumerações detalhadas n
 | :--- | :--- | :--- |
 | Desenvolvedor e administrador (usuário) | `User` / `users` | `id`, `name`, `email`, `passwordHash`, `phone`, `role`, `isActive`, `emailVerifiedAt`, `demoUsedAt`, `accessExpiresAt` |
 | Confirmação de e-mail | `EmailVerification` / `email_verifications` | `id`, `userId`, `email`, `tokenHash`, `expiresAt`, `usedAt` |
+| Sessão de autenticação | `AuthSession` / `auth_sessions` | `id`, `userId`, `expiresAt`, `revokedAt` |
 | Estabelecimento | `Establishment` / `establishments` | `id`, `source`, `sourceId`, `name`, `address`, `city`, `state`, `phone`, `websiteUrl`, `sourceUpdatedAt` |
 | Histórico de resultados | `SearchResult` / `search_results` | `id`, `userId`, `establishmentId`, `firstSeenAt`, `lastSeenAt`, `isDismissed` |
 | Acompanhamento | `FollowUp` / `follow_ups` | `id`, `searchResultId`, `status`, `projectAmount` |
@@ -305,6 +307,7 @@ Termos sem tabela própria:
 ```mermaid
 erDiagram
     users ||--o{ email_verifications : possui
+    users ||--o{ auth_sessions : possui
     users ||--o{ search_results : possui
     establishments ||--o{ search_results : aparece
     search_results ||--o| follow_ups : origina
@@ -330,6 +333,12 @@ erDiagram
         string tokenHash UK
         datetime expiresAt
         datetime usedAt
+    }
+    auth_sessions {
+        uuid id PK
+        uuid userId FK
+        datetime expiresAt
+        datetime revokedAt
     }
     establishments {
         uuid id PK
@@ -378,6 +387,11 @@ erDiagram
     }
 ```
 
+Cada usuário pode ter várias sessões. Uma entrada bem-sucedida cria uma sessão
+com identificador aleatório e prazo fixo em `expiresAt`. A sessão perde a
+validade no vencimento ou quando `revokedAt` é preenchido. A exclusão do usuário
+remove suas sessões em cascata.
+
 Unicidades compostas: `establishments(source, sourceId)`,
 `search_results(userId, establishmentId)` e `payments(provider, providerPaymentId)`
 quando existir ID externo. Um acompanhamento por resultado no histórico; o
@@ -420,7 +434,7 @@ Variáveis previstas, sem valores: `DATABASE_URL`, `DIRECT_URL` quando necessár
 | :--- | :--- |
 | Preço, cotas, unidade de consumo e efeitos de filtros/falhas | PRD §9, antes de busca/contratação; dimensionar Places e Place Details |
 | Prazo de expiração do pedido e suporte para confirmação ausente | Spec US08; sair da página não cancela pedido |
-| Transporte, duração e encerramento da sessão JWT | Spec US03, antes do login/logout |
+| Encerramento da sessão atual e revogação das sessões na desativação | Tarefas de logout e desativação da US03 |
 | Redefinição administrativa de senha | PRD §9, antes da gestão de usuários |
 | Domínio remetente e DNS no Resend | Antes do envio para usuários reais; domínio de teste tem destinatários restritos |
 | Hospedagem da API e web | Deploy; avaliar proximidade do banco Neon |

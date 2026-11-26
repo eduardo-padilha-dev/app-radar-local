@@ -1,4 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthSessionGuard } from './auth-session.guard.js';
+import { AuthSessionService } from './auth-session.service.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { PrismaModule } from '../../database/prisma.module.js';
@@ -8,14 +12,31 @@ import { SearchEmailEligibilityService } from './search-email-eligibility.servic
 import { VerificationToken } from './verification-token.js';
 
 @Module({
-  imports: [PrismaModule, ResendModule],
+  imports: [
+    PrismaModule,
+    ResendModule,
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.getOrThrow<string>('JWT_SECRET'),
+        signOptions: { algorithm: 'HS256' },
+        verifyOptions: { algorithms: ['HS256'] },
+      }),
+    }),
+  ],
   controllers: [AuthController],
   providers: [
     AuthService,
+    AuthSessionService,
+    AuthSessionGuard,
     PasswordHasher,
     SearchEmailEligibilityService,
     VerificationToken,
   ],
-  exports: [SearchEmailEligibilityService],
+  exports: [
+    AuthSessionGuard,
+    AuthSessionService,
+    SearchEmailEligibilityService,
+  ],
 })
 export class AuthModule {}

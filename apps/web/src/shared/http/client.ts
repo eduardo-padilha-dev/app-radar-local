@@ -14,14 +14,24 @@ export class HttpTransportError extends Error {
   }
 }
 
-export async function post<T>(path: string, body: unknown): Promise<T> {
-  const baseUrl = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
-  const response = await fetch(`${baseUrl}${path}`, {
+type HttpOptions = Pick<RequestInit, "credentials">;
+
+export function post<T>(path: string, body: unknown, options?: HttpOptions): Promise<T> {
+  return request<T>(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "omit",
     body: JSON.stringify(body),
-  }).catch((cause: unknown) => {
+    ...options,
+  });
+}
+
+export function get<T>(path: string, options?: HttpOptions): Promise<T> {
+  return request<T>(path, { method: "GET", ...options });
+}
+
+async function request<T>(path: string, init: RequestInit): Promise<T> {
+  const baseUrl = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}${path}`, { credentials: "omit", ...init }).catch((cause: unknown) => {
     throw new HttpTransportError(cause);
   });
   if (!response.ok) {

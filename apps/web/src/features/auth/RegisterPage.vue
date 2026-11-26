@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { RouterLink } from "vue-router";
 import { useRegistration } from "./useRegistration";
 import { useVerificationResend } from "./useVerificationResend";
 
@@ -95,7 +96,6 @@ const { message: resendMessage, blocked: resendBlocked, resend } = useVerificati
         <p class="guidance">
           * Campos obrigatórios. Cadastro exclusivo para desenvolvedores freelancers.
         </p>
-        <!-- // TODO #4: conectar ao fluxo real de entrada. -->
         <p v-if="state === 'email-already-registered'" class="error" role="alert">
           Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.
         </p>
@@ -129,8 +129,9 @@ const { message: resendMessage, blocked: resendBlocked, resend } = useVerificati
           <p v-if="resendMessage" class="guidance" role="status">{{ resendMessage }}</p>
         </form>
       </details>
-      <!-- // TODO #4: conectar ao fluxo real de entrada. -->
-      <p class="guidance">Já tem uma conta? A entrada estará disponível em breve.</p>
+      <p v-if="state !== 'success'" class="guidance">
+        Já tem uma conta? <RouterLink :to="{ name: 'login' }">Entre na sua conta</RouterLink>.
+      </p>
     </section>
   </main>
 </template>

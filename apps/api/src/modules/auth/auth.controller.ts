@@ -1,11 +1,17 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
+  Get,
+  Header,
   HttpCode,
   HttpStatus,
   Inject,
   Post,
+  Req,
+  Res,
   UseFilters,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
@@ -13,13 +19,26 @@ import {
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
+  ApiCookieAuth,
   ApiCreatedResponse,
   ApiExtraModels,
+  ApiForbiddenResponse,
   ApiGoneResponse,
   ApiOkResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
+import type { Request, Response } from 'express';
+import {
+  AuthSessionGuard,
+  SESSION_COOKIE,
+  type AuthenticatedRequest,
+} from './auth-session.guard.js';
+import { AuthSessionService } from './auth-session.service.js';
+import { LoginDto } from './dto/login.dto.js';
+import { SessionProfile } from './dto/session-profile.dto.js';
 import { ApiExceptionFilter } from '../../common/api-exception.filter.js';
 import {
   AuthService,
@@ -33,10 +52,65 @@ import { RegistrationResult } from './dto/registration-result.dto.js';
 import { ResendVerificationDto } from './dto/resend-verification.dto.js';
 import { ResendVerificationResult } from './dto/resend-verification-result.dto.js';
 
+const sessionProfileResponse = {
+  schema: {
+    type: 'object',
+    required: ['data'],
+    properties: {
+      data: { $ref: getSchemaPath(SessionProfile) },
+    },
+  },
+};
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(@Inject(AuthService) private readonly auth: AuthService) {}
+  constructor(
+    @Inject(AuthService) private readonly auth: AuthService,
+    @Inject(AuthSessionService) private readonly sessions: AuthSessionService,
+    @Inject(ConfigService) private readonly config: ConfigService,
+  ) {}
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @ApiBody({ type: LoginDto })
+  @ApiExtraModels(SessionProfile)
+  @ApiOkResponse(sessionProfileResponse)
+  @ApiBadRequestResponse({ description: 'Dados de entrada inválidos.' })
+  @ApiUnauthorizedResponse({ description: 'Credenciais recusadas.' })
+  @ApiForbiddenResponse({ description: 'Origem não autorizada.' })
+  async login(
+    @Body() input: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<SessionProfile> {
+    const allowedOrigin = new URL(
+      this.config.getOrThrow<string>('CORS_ORIGIN'),
+    );
+    if (req.headers.origin !== allowedOrigin.origin) {
+      throw new ForbiddenException();
+    }
+    const { profile, token, expiresAt } = await this.sessions.login(input);
+    res.cookie(SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: req.secure || allowedOrigin.protocol === 'https:',
+      path: '/',
+      expires: expiresAt,
+    });
+    return profile;
+  }
+
+  @Get('session')
+  @UseGuards(AuthSessionGuard)
+  @ApiCookieAuth()
+  @ApiExtraModels(SessionProfile)
+  @ApiOkResponse(sessionProfileResponse)
+  @ApiUnauthorizedResponse({ description: 'Sessão ausente ou inválida.' })
+  session(@Req() req: AuthenticatedRequest): SessionProfile {
+    return req.authenticatedUser;
+  }
 
   @Post('register')
   @ApiBody({ type: RegisterDto })

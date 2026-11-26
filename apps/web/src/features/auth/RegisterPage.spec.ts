@@ -25,7 +25,7 @@ describe("registration page", () => {
       { status },
     ));
     vi.stubGlobal("fetch", fetchMock);
-    const page = mount(RegisterPage);
+    const page = mount(RegisterPage, { global: { stubs: { RouterLink: true } } });
     try {
       await page.get("#name").setValue("Ana");
       await page.get("#email").setValue("ana@example.com");
@@ -157,7 +157,7 @@ describe("registration page", () => {
         new Response(JSON.stringify({ data: { retryAfterSeconds: 60 } }), { status: 202 }),
       );
     vi.stubGlobal("fetch", fetchMock);
-    const page = mount(RegisterPage);
+    const page = mount(RegisterPage, { global: { stubs: { RouterLink: true } } });
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
       await page.get("#name").setValue("Ana");
@@ -228,7 +228,7 @@ describe("registration page", () => {
         return new Response(body, { status: 201 });
       });
       vi.stubGlobal("fetch", fetchMock);
-      const page = mount(RegisterPage);
+      const page = mount(RegisterPage, { global: { stubs: { RouterLink: true } } });
       try {
         for (const [field, value] of Object.entries(input)) {
           await page.get(`#${field}`).setValue(value);
@@ -275,7 +275,7 @@ describe("registration page", () => {
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
-    const page = mount(RegisterPage);
+    const page = mount(RegisterPage, { global: { stubs: { RouterLink: true } } });
     await page.get("#name").setValue("Ana");
     await page.get("#email").setValue("ana@example.com");
     await page.get("#password").setValue("same password");
@@ -309,7 +309,10 @@ describe("registration page", () => {
         { status: 201 },
       ));
     vi.stubGlobal("fetch", fetchMock);
-    const page = mount(RegisterPage, { attachTo: document.body });
+    const page = mount(RegisterPage, {
+      attachTo: document.body,
+      global: { stubs: { RouterLink: true } },
+    });
     const values = {
       name: "",
       email: "email-invalido",

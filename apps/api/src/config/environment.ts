@@ -1,6 +1,7 @@
 export function validateEnvironment(environment: Record<string, unknown>) {
   for (const name of [
     'DATABASE_URL',
+    'JWT_SECRET',
     'RESEND_API_KEY',
     'EMAIL_FROM',
     'WEB_URL',

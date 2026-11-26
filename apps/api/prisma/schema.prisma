@@ -29,6 +29,7 @@ model User {
   demoUsedAt         DateTime?           @db.Timestamptz(3)
   accessExpiresAt    DateTime?           @db.Timestamptz(3)
   emailVerifications EmailVerification[]
+  authSessions       AuthSession[]
 
   @@map("users")
 }
@@ -43,4 +44,15 @@ model EmailVerification {
   user      User      @relation(fields: [userId], references: [id])
 
   @@map("email_verifications")
+}
+
+model AuthSession {
+  id        String    @id @db.Uuid
+  userId    String    @db.Uuid
+  expiresAt DateTime  @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_sessions")
 }
