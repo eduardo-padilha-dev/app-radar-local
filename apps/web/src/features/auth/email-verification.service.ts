@@ -1,10 +1,10 @@
 import { HttpError, post } from "../../shared/http/client";
 
 interface EmailVerificationResult {
-  status: "confirmed";
+  status: "confirmed" | "already-confirmed";
 }
 
-type EmailVerificationOutcome = EmailVerificationResult | { status: "invalid" | "expired" };
+export type EmailVerificationOutcome = EmailVerificationResult | { status: "invalid" | "expired" };
 
 export async function verifyEmail(token: string): Promise<EmailVerificationOutcome> {
   try {

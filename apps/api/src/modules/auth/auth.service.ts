@@ -109,12 +109,21 @@ export class AuthService {
         where: { tokenHash, userId: candidate.userId },
         include: { user: { select: { email: true, emailVerifiedAt: true } } },
       });
-      if (
-        !verification ||
-        verification.email !== verification.user.email ||
-        verification.usedAt !== null ||
-        verification.user.emailVerifiedAt !== null
-      ) {
+      if (!verification || verification.email !== verification.user.email) {
+        throw new PublicApiException(
+          invalidVerificationLink,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const {
+        usedAt,
+        user: { emailVerifiedAt },
+      } = verification;
+      if (usedAt !== null && emailVerifiedAt !== null) {
+        return { status: 'already-confirmed' };
+      }
+      if (usedAt !== null || emailVerifiedAt !== null) {
         throw new PublicApiException(
           invalidVerificationLink,
           HttpStatus.BAD_REQUEST,

@@ -27,10 +27,10 @@
   - Teste primeiro: com uma conta real no banco de testes, executar a regra a partir da tentativa de acesso. Exigir recusa específica antes da etapa que continuaria a busca e conferir `demoUsedAt` no banco. Confirmar o e-mail e repetir para provar que o fluxo pode avaliar as demais condições. O RED vem da ausência da regra de acesso.
   - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.module.ts,search-email-eligibility.service.ts}`.
 
-- [ ] **Tarefa 4 — Retomar confirmação após perda da resposta**
+- [x] **Tarefa 4 — Retomar confirmação após perda da resposta**
   - Cobre: CA5.
   - Teste primeiro: concluir a confirmação no servidor, descartar a resposta e reenviar o mesmo token. Conferir que a primeira data é preservada, inclusive sob concorrência e reabertura posterior à validade original. Na interface, simular falha antes da gravação e depois dela. A nova tentativa com link válido deve mostrar “E-mail confirmado” no primeiro caso e “E-mail já confirmado” no segundo. O RED vem da ausência do estado de retomada ou do tratamento da repetição.
-  - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.controller.ts,auth.service.ts,dto/email-verification-result.dto.ts}`, `apps/web/src/features/auth/{VerifyEmailPage.vue,VerifyEmailPage.spec.ts,email-verification.service.ts}`.
+  - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.controller.ts,auth.service.ts,dto/email-verification-result.dto.ts}`, `apps/web/src/features/auth/{VerifyEmailPage.vue,VerifyEmailPage.spec.ts,email-verification.service.ts,useEmailVerification.ts}`.
 
 - [ ] **Tarefa 5 — Reenviar o link de confirmação**
   - Cobre: CA4.

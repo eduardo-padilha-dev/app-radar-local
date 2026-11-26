@@ -6,7 +6,11 @@ import { useEmailVerification } from "./useEmailVerification";
 const route = useRoute();
 const { state, confirm } = useEmailVerification();
 
-onMounted(() => confirm(route.query.token));
+function confirmLink() {
+  return confirm(route.query.token);
+}
+
+onMounted(confirmLink);
 </script>
 
 <template>
@@ -18,6 +22,9 @@ onMounted(() => confirm(route.query.token));
       <h1 id="verification-title">Confirmação de e-mail</h1>
       <p v-if="state === 'idle' || state === 'confirming'" role="status">Confirmando seu e-mail…</p>
       <p v-else-if="state === 'confirmed'" class="success" role="status">E-mail confirmado</p>
+      <p v-else-if="state === 'already-confirmed'" class="success" role="status">
+        E-mail já confirmado
+      </p>
       <p v-else-if="state === 'invalid'" class="error" role="alert">
         O link de confirmação é inválido.
       </p>
@@ -34,7 +41,10 @@ onMounted(() => confirm(route.query.token));
           </form>
         </details>
       </template>
-      <p v-else class="error" role="alert">Não foi possível confirmar o e-mail.</p>
+      <template v-else>
+        <p class="error" role="alert">Não foi possível confirmar o e-mail.</p>
+        <button class="retry" type="button" @click="confirmLink">Tentar novamente</button>
+      </template>
     </section>
   </main>
 </template>
@@ -75,6 +85,25 @@ h1 {
 }
 .error {
   color: var(--perigo);
+}
+.retry {
+  margin-top: var(--espaco-md);
+  min-height: 2.5rem;
+  padding: var(--espaco-sm) var(--espaco-md);
+  border: 0;
+  border-radius: 0.25rem;
+  background: var(--primaria);
+  color: var(--superficie);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.retry:hover {
+  background: var(--primaria-hover);
+}
+.retry:focus-visible {
+  outline: 2px solid var(--primaria);
+  outline-offset: 3px;
 }
 .resend {
   margin-top: var(--espaco-md);

@@ -1,8 +1,8 @@
 import { ref } from "vue";
-import { verifyEmail } from "./email-verification.service";
+import { type EmailVerificationOutcome, verifyEmail } from "./email-verification.service";
 
 export function useEmailVerification() {
-  const state = ref<"idle" | "confirming" | "confirmed" | "invalid" | "expired" | "failed">("idle");
+  const state = ref<"idle" | "confirming" | EmailVerificationOutcome["status"] | "failed">("idle");
 
   async function confirm(token: unknown) {
     if (state.value === "confirming") return;

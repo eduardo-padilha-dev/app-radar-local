@@ -224,6 +224,100 @@ describe('email verification', () => {
     });
   });
 
+  it('recovers a lost confirmation response with the same link after its original expiration', async () => {
+    const issuedAt = new Date('2026-11-10T00:00:00.000Z');
+    const confirmedAt = new Date('2026-11-10T12:00:00.000Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(issuedAt.getTime());
+    const { token, user, verification } = await registerAndReadState();
+
+    clock.mockReturnValue(confirmedAt.getTime());
+    await request(app.getHttpServer()).post('/auth/verify-email').send({ token });
+    const confirmedUser = { ...user, emailVerifiedAt: confirmedAt };
+    const usedVerification = { ...verification, usedAt: confirmedAt };
+    await expectUnchangedState(confirmedUser, usedVerification);
+
+    clock.mockReturnValue(verification.expiresAt.getTime() + 1);
+    await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send({ token })
+      .expect(200, { data: { status: 'already-confirmed' } });
+
+    await expectUnchangedState(confirmedUser, usedVerification);
+  });
+
+  it('confirms a link only once when two requests use it concurrently', async () => {
+    const issuedAt = new Date('2026-11-10T00:00:00.000Z');
+    const confirmedAt = new Date('2026-11-10T12:00:00.000Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(issuedAt.getTime());
+    const { token, user, verification } = await registerAndReadState();
+
+    clock.mockReturnValue(confirmedAt.getTime());
+    const verifyLink = () =>
+      request(app.getHttpServer()).post('/auth/verify-email').send({ token });
+    const responses = await Promise.all([
+      verifyLink().expect(200),
+      verifyLink().expect(200),
+    ]);
+
+    expect(responses.map(({ body }) => body)).toEqual(
+      expect.arrayContaining([
+        { data: { status: 'confirmed' } },
+        { data: { status: 'already-confirmed' } },
+      ]),
+    );
+
+    clock.mockReturnValue(confirmedAt.getTime() + 1);
+    const previousConfirmation = { data: { status: 'already-confirmed' } };
+    await Promise.all([
+      verifyLink().expect(200, previousConfirmation),
+      verifyLink().expect(200, previousConfirmation),
+    ]);
+    await expectUnchangedState(
+      { ...user, emailVerifiedAt: confirmedAt },
+      { ...verification, usedAt: confirmedAt },
+    );
+  });
+
+  it('rejects a used link when it no longer matches the current email address', async () => {
+    const { token, user, verification } = await registerAndReadState();
+    await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send({ token })
+      .expect(200, { data: { status: 'confirmed' } });
+    const usedVerification = await prisma.emailVerification.findUniqueOrThrow({
+      where: { id: verification.id },
+    });
+    const currentUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { email: 'verify-' + randomUUID() + '@example.com' },
+    });
+
+    try {
+      await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ token })
+        .expect(400, {
+          statusCode: 400,
+          code: 'VERIFICATION_LINK_INVALID',
+          message: 'O link de confirmação é inválido.',
+        });
+
+      await expectUnchangedState(currentUser, usedVerification);
+    } finally {
+      await prisma.user.update({ where: { id: user.id }, data: { email } });
+    }
+  });
+
+  it('documents both confirmation statuses in OpenAPI', async () => {
+    const { body } = await request(app.getHttpServer())
+      .get('/docs-json')
+      .expect(200);
+
+    expect(
+      body.components.schemas.EmailVerificationResult.properties.status.enum,
+    ).toEqual(['confirmed', 'already-confirmed']);
+  });
+
   async function registerAndReadState() {
     const token = await registerAndReadLink();
     const user = await prisma.user.findUniqueOrThrow({ where: { email } });

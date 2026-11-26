@@ -99,6 +99,58 @@ it("identifies an expired link and offers resend with an email field", async () 
   }
 });
 
+it.each([
+  ["before confirmation was saved", false, "E-mail confirmado"],
+  ["after confirmation was saved", true, "E-mail já confirmado"],
+])("retries with the same link when the response is lost %s", async (_case, saved, message) => {
+  const token = "A".repeat(43);
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockRejectedValueOnce(new TypeError("Connection lost"))
+    .mockImplementationOnce(async () => {
+      const status = saved ? "already-confirmed" : "confirmed";
+      return new Response(JSON.stringify({ data: { status } }), { status: 200 });
+    });
+  vi.stubGlobal("fetch", fetchMock);
+  const page = await openVerificationPage("/confirmar-email?token=" + token);
+  try {
+    expect(page.get("[role=alert]").text()).toBe("Não foi possível confirmar o e-mail.");
+    const retry = page.get("button");
+    expect(retry.text()).toBe("Tentar novamente");
+    await retry.trigger("click");
+    await flushPromises();
+
+    expect(page.get("[role=status]").text()).toBe(message);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/\/auth\/verify-email$/),
+      expect.objectContaining({
+        method: "POST",
+        credentials: "omit",
+        body: JSON.stringify({ token }),
+      }),
+    );
+  } finally {
+    page.unmount();
+  }
+});
+
+it("shows the saved confirmation when the original link is reopened", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>().mockImplementation(async () => {
+      return new Response(JSON.stringify({ data: { status: "already-confirmed" } }), { status: 200 });
+    }),
+  );
+  const page = await openVerificationPage("/confirmar-email?token=" + "A".repeat(43));
+  try {
+    expect(page.get("[role=status]").text()).toBe("E-mail já confirmado");
+  } finally {
+    page.unmount();
+  }
+});
+
 async function openVerificationPage(path: string) {
   const router = createRouter({
     history: createMemoryHistory(),
