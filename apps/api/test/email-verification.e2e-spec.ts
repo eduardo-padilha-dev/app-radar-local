@@ -326,6 +326,7 @@ describe('email verification', () => {
     ).toEqual(['confirmed', 'already-confirmed']);
   });
 
+  const resendResponseWindowMs = 16_000;
   const resendResult = { data: { retryAfterSeconds: 60 } };
 
   function requestResend(address = email) {
@@ -365,6 +366,8 @@ describe('email verification', () => {
         resendResult,
       );
       expect(send).toHaveBeenCalledTimes(2);
+
+      expect(delay).toHaveBeenCalledExactlyOnceWith(resendResponseWindowMs);
 
       const [recipient, newLink] = send.mock.calls[1]!;
       expect(recipient).toBe(email);
@@ -417,6 +420,9 @@ describe('email verification', () => {
       ),
     ]);
 
+    expect(delay).toHaveBeenCalledTimes(2);
+    expect(delay).toHaveBeenNthCalledWith(1, resendResponseWindowMs);
+    expect(delay).toHaveBeenNthCalledWith(2, resendResponseWindowMs);
     expect(send).not.toHaveBeenCalled();
     expect(
       await prisma.emailVerification.count({ where: { userId: user.id } }),
@@ -448,6 +454,77 @@ describe('email verification', () => {
     });
     return { promise, resolve };
   }
+
+  it.each([
+    ['rejects the send', new Error('Provider rejected the send'), 0],
+    ['times out', new DOMException('Provider timed out', 'AbortError'), 10_000],
+  ])('keeps confirmation pending and allows resend when the provider %s', async (_case, error, providerDelayMs) => {
+    const issuedAt = Date.parse('2026-11-10T00:00:00.000Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(issuedAt);
+    const { user, verification } = await registerAndReadState();
+    const failedResendAt = issuedAt + 60_000;
+    clock.mockReturnValue(failedResendAt);
+
+    const sendStarted = deferred();
+    const windowElapsed = deferred();
+    vi.mocked(delay).mockReturnValueOnce(windowElapsed.promise);
+    send.mockImplementationOnce(() => new Promise<void>((_resolve, reject) => {
+      setTimeout(() => reject(error), providerDelayMs);
+      sendStarted.resolve();
+    }));
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const firstResend = requestResend().expect(202, resendResult).then(
+      (response) => response,
+    );
+    try {
+      await sendStarted.promise;
+      await vi.advanceTimersByTimeAsync(providerDelayMs);
+      const responded = await Promise.race([
+        firstResend.then(() => true),
+        nextTurn().then(() => false),
+      ]);
+      expect(responded).toBe(false);
+      expect(delay).toHaveBeenCalledExactlyOnceWith(resendResponseWindowMs);
+    } finally {
+      vi.useRealTimers();
+      windowElapsed.resolve();
+      await firstResend;
+    }
+
+    await expectUnchangedState(user, verification);
+    expect(
+      await prisma.emailVerification.count({ where: { userId: user.id } }),
+    ).toBe(2);
+
+    clock.mockReturnValue(failedResendAt + 59_999);
+    await requestResend().expect(202, resendResult);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(
+      await prisma.emailVerification.count({ where: { userId: user.id } }),
+    ).toBe(2);
+
+    const retriedAt = failedResendAt + 60_000;
+    clock.mockReturnValue(retriedAt);
+    await requestResend().expect(202, resendResult);
+    expect(delay).toHaveBeenCalledTimes(3);
+    expect(delay).toHaveBeenNthCalledWith(2, resendResponseWindowMs);
+    expect(delay).toHaveBeenNthCalledWith(3, resendResponseWindowMs);
+    expect(send).toHaveBeenCalledTimes(3);
+    const [recipient, deliveredLink] = send.mock.calls[2]!;
+    expect(recipient).toBe(email);
+    expect(deliveredLink).not.toBe(send.mock.calls[1]![1]);
+    await expectUnchangedState(user, verification);
+
+    const token = new URL(deliveredLink).searchParams.get('token');
+    await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send({ token })
+      .expect(200, { data: { status: 'confirmed' } });
+    expect(
+      await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+    ).toEqual({ ...user, emailVerifiedAt: new Date(retriedAt) });
+  });
 
   it('waits for the resend to finish even if the public window has elapsed', async () => {
     const issuedAt = new Date('2026-11-10T00:00:00.000Z');

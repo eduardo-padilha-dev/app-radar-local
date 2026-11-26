@@ -99,6 +99,65 @@ describe("registration page", () => {
     }
   });
 
+  it("allows another resend from registration 60 seconds after losing the response", async () => {
+    const email = "ana@example.com";
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          code: "VERIFICATION_EMAIL_UNCONFIRMED",
+          details: { accountCreated: true, emailVerificationPending: true },
+        }),
+        { status: 502 },
+      ))
+      .mockRejectedValueOnce(new TypeError("Connection lost"))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { retryAfterSeconds: 60 } }), { status: 202 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const page = mount(RegisterPage);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await page.get("#name").setValue("Ana");
+      await page.get("#email").setValue(email);
+      await page.get("#password").setValue("same password");
+      await page.get("form").trigger("submit");
+      await flushPromises();
+
+      const resend = page.get("button");
+      await resend.trigger("click");
+      await flushPromises();
+      expect(page.get("[role=status]").text()).toBe(
+        "Não foi possível receber a resposta da solicitação. Aguarde 60 segundos para tentar novamente.",
+      );
+      expect(resend.attributes("disabled")).toBeDefined();
+
+      await vi.advanceTimersByTimeAsync(59_999);
+      await resend.trigger("click");
+      expect(resend.attributes("disabled")).toBeDefined();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(resend.attributes("disabled")).toBeUndefined();
+      expect(page.get("[role=status]").text()).toBe(
+        "Não foi possível receber a resposta da solicitação.",
+      );
+      await resend.trigger("click");
+      await flushPromises();
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        expect.stringMatching(/\/auth\/resend-verification$/),
+        expect.objectContaining({ body: JSON.stringify({ email }) }),
+      );
+      expect(page.get("[role=status]").text()).toContain(
+        "Se houver uma conta pendente para este e-mail, verifique sua caixa de entrada.",
+      );
+      expect(resend.attributes("disabled")).toBeDefined();
+    } finally {
+      page.unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it.each(["before the headers", "while reading the body"] as const)(
     "allows retry after losing the first registration response %s",
     async (failure) => {
