@@ -63,6 +63,8 @@ história pequena e `M`, algumas tarefas. São estimativas iniciais a revisar
 antes da implementação. O aluno promove a `🟡 Ready`; `🟢 Live` somente após
 PR mesclado. Os critérios descrevem comportamento esperado, ainda não entregue.
 
+<a name="us01--criar-conta-de-desenvolvedor--must-have--s--status--ready"></a>
+
 ### US01 — Criar conta de desenvolvedor · `Must Have` · `S` · Status: `🟢 Live`
 
 **Como** desenvolvedor freelancer, **eu quero** criar minha conta **para que**

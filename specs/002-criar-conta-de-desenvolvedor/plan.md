@@ -122,7 +122,7 @@
   - Validação: conferir os comandos de configuração da API, do frontend e do banco de testes e executar as verificações locais aplicáveis.
   - Arquivo previsto: `README.md`.
 
-- [ ] **Tarefa 11 — Preservar o link da issue #2 para a US01 no PRD**
+- [x] **Tarefa 11 — Preservar o link da issue #2 para a US01 no PRD**
   - Cobre: pendência 2 da auditoria final.
   - Validação: verificar se o fragmento usado pela issue #2 tem um destino explícito na seção da US01, independente do status no título.
   - Arquivo previsto: `docs/prd.md`.
