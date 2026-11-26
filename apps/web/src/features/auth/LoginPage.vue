@@ -1,100 +1,71 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
+import AccessFrame from "./AccessFrame.vue";
+import infoIcon from "./assets/info.svg";
 import { useLogin } from "./useLogin";
 
 const { fields, submitting, error, submit } = useLogin();
 </script>
 
 <template>
-  <main>
-    <section aria-labelledby="login-title">
-      <h1 id="login-title">Entre na sua conta</h1>
-      <form :aria-busy="submitting" @submit.prevent="submit">
-        <label for="login-email">
-          E-mail
-          <input
-            id="login-email"
-            v-model="fields.email"
-            name="email"
-            type="email"
-            autocomplete="username"
-            required
-          />
-        </label>
-        <label for="login-password">
-          Senha
-          <input
-            id="login-password"
-            v-model="fields.password"
-            name="password"
-            type="password"
-            autocomplete="current-password"
-            required
-          />
-        </label>
-        <p v-if="error" role="alert">{{ error }}</p>
-        <button type="submit" :disabled="submitting">{{ submitting ? "Entrando…" : "Entrar" }}</button>
+  <AccessFrame>
+    <section class="access-card" aria-labelledby="login-title">
+      <div>
+        <h1 id="login-title">Entre no Radar Local</h1>
+        <p class="access-intro">Seu próximo projeto começa por aqui.</p>
+      </div>
+      <form class="access-form" :aria-busy="submitting" @submit.prevent="submit">
+        <div class="access-fields">
+          <label for="login-email">
+            Email *
+            <input
+              id="login-email"
+              v-model="fields.email"
+              name="email"
+              type="email"
+              autocomplete="username"
+              required
+            />
+          </label>
+          <label for="login-password">
+            Senha *
+            <input
+              id="login-password"
+              v-model="fields.password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+        </div>
+        <p v-if="error" class="access-error" role="alert">{{ error }}</p>
+        <button class="access-action" type="submit" :disabled="submitting">
+          {{ submitting ? "Entrando…" : "Entrar" }}
+        </button>
       </form>
-      <RouterLink :to="{ name: 'register' }">Criar conta</RouterLink>
+      <aside class="access-note">
+        <img :src="infoIcon" alt="" />
+        <div>
+          <p>Ainda não confirmou o email?</p>
+          <p>Você pode entrar. A busca fica bloqueada até confirmar, sem consumir sua demonstração.</p>
+        </div>
+      </aside>
+      <p class="login-signup">
+        Não tem uma conta?
+        <RouterLink class="access-link" :to="{ name: 'register' }">Criar conta</RouterLink>
+      </p>
     </section>
-  </main>
+  </AccessFrame>
 </template>
 
 <style scoped>
-main {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: var(--espaco-md);
-}
-
-section {
-  width: min(100%, 28rem);
-  display: grid;
-  gap: var(--espaco-lg);
-  padding: var(--espaco-lg);
-  background: var(--superficie);
-  border: 1px solid var(--desabilitado);
-  border-radius: var(--espaco-sm);
-}
-
-h1 {
-  font-size: var(--titulo-pagina);
-}
-
-form,
-label {
-  display: grid;
+.login-signup {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--espaco-sm);
-}
-
-form {
-  gap: var(--espaco-md);
-}
-
-input,
-button {
-  font: inherit;
-  border-radius: var(--espaco-xs);
-  padding: var(--espaco-sm);
-}
-
-input {
-  border: 1px solid var(--texto-suave);
-}
-
-button {
-  border: 0;
-  background: var(--primaria);
-  color: var(--superficie);
-}
-
-button:disabled {
-  background: var(--desabilitado);
-  color: var(--texto-suave);
-}
-
-[role="alert"] {
-  color: var(--perigo);
+  padding-top: var(--espaco-lg);
+  border-top: 1px solid var(--desabilitado);
+  font-size: var(--legenda);
 }
 </style>

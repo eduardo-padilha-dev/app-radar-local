@@ -11,6 +11,7 @@ import {
 export function useRegistration() {
   const fields = reactive({ name: "", email: "", password: "", phone: "" });
   const errors = ref<RegistrationFieldErrors>({});
+  const submittedEmail = ref("");
   const state = ref<
     | "idle"
     | "submitting"
@@ -28,14 +29,15 @@ export function useRegistration() {
     ) return;
     errors.value = {};
     state.value = "submitting";
+    const input = {
+      name: fields.name,
+      email: fields.email,
+      password: fields.password,
+      ...(fields.phone ? { phone: fields.phone } : {}),
+    };
     try {
-      const input = {
-        name: fields.name,
-        email: fields.email,
-        password: fields.password,
-        ...(fields.phone ? { phone: fields.phone } : {}),
-      };
       await register(input);
+      submittedEmail.value = input.email;
       fields.password = "";
       state.value = "success";
     } catch (error) {
@@ -45,6 +47,7 @@ export function useRegistration() {
       } else if (error instanceof EmailAlreadyRegisteredError) {
         state.value = "email-already-registered";
       } else if (error instanceof VerificationEmailUnconfirmedError) {
+        submittedEmail.value = input.email;
         fields.password = "";
         state.value = "email-unconfirmed";
       } else if (error instanceof RegistrationOutcomeUnknownError) {
@@ -54,5 +57,5 @@ export function useRegistration() {
       }
     }
   }
-  return { fields, errors, state, submit };
+  return { fields, errors, state, submittedEmail, submit };
 }

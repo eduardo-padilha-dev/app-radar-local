@@ -36,6 +36,9 @@ it.each([
   const page = mount(App, { global: { plugins: [router] } });
   try {
     expect(router.currentRoute.value.name).toBe("login");
+    expect(page.get("header").text()).toContain("Radar Local");
+    expect(page.get("h1").text()).toBe("Entre no Radar Local");
+    expect(page.text()).toContain("Ainda não confirmou o email?");
     await page.get('input[type="email"]').setValue("ana@example.com");
     const passwordInput = page.get<HTMLInputElement>('input[type="password"]');
     // Setting a value programmatically in jsdom bypasses the native input limit.

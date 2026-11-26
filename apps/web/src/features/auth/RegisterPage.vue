@@ -1,42 +1,55 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { RouterLink } from "vue-router";
+import AccessFrame from "./AccessFrame.vue";
+import arrowIcon from "./assets/arrow-left.svg";
+import infoIcon from "./assets/info-blue.svg";
 import { useRegistration } from "./useRegistration";
 import { useVerificationResend } from "./useVerificationResend";
 
-const { fields, errors, state, submit } = useRegistration();
+const { fields, errors, state, submittedEmail, submit } = useRegistration();
 const resendEmail = ref("");
 const { message: resendMessage, blocked: resendBlocked, resend } = useVerificationResend();
 </script>
 
 <template>
-  <header class="access-header">
-    <span class="brand">Radar Local</span>
-    <span class="tagline">Prospecção para desenvolvedores freelancers</span>
-  </header>
-  <main class="registration">
-    <section class="registration-card" aria-labelledby="registration-title">
-      <div>
+  <AccessFrame :variant="state === 'success' || state === 'email-unconfirmed' ? 'confirmation' : 'registration'">
+    <section class="access-card" aria-labelledby="registration-title">
+      <div v-if="state !== 'success' && state !== 'email-unconfirmed'">
         <h1 id="registration-title">Crie sua conta</h1>
-        <p class="description">Organize sua prospecção em um só lugar.</p>
+        <p class="access-intro">Organize sua prospecção em um só lugar.</p>
       </div>
-      <template v-if="state === 'success'">
-        <p class="success" role="status">
-          Conta criada. Confira seu e-mail para confirmar o cadastro.
-        </p>
-        <p class="guidance">Abra o link recebido para confirmar seu e-mail.</p>
-      </template>
-      <template v-else-if="state === 'email-unconfirmed'">
-        <p class="error" role="alert">
+      <template v-if="state === 'success' || state === 'email-unconfirmed'">
+        <div>
+          <h1 id="registration-title">Confirme seu email</h1>
+          <p v-if="state === 'success'" class="access-intro">Enviamos um link para {{ submittedEmail }}.</p>
+          <p v-else class="access-intro">{{ submittedEmail }}</p>
+        </div>
+        <p v-if="state === 'email-unconfirmed'" class="access-error" role="alert">
           Sua conta foi criada, mas não conseguimos confirmar o envio do e-mail de confirmação. Tente reenviar o link.
         </p>
-        <button type="button" :disabled="resendBlocked" @click="resend(fields.email)">
+        <div class="access-note">
+          <img :src="infoIcon" alt="" />
+          <div>
+            <p class="access-note-title">Link único • válido por 24 horas</p>
+            <p>Abra o email e use o link para confirmar sua conta. Cada link pode ser usado uma única vez.</p>
+          </div>
+        </div>
+        <div v-if="state === 'success'" class="confirmation-guidance access-intro">
+          <p role="status">Conta criada. Confira seu e-mail para confirmar o cadastro.</p>
+          <p>Verifique também a pasta de spam. Se o link expirar, solicite um novo envio.</p>
+        </div>
+        <button class="access-action access-action--secondary" type="button" :disabled="resendBlocked" @click="resend(submittedEmail)">
           Reenviar link de confirmação
         </button>
-        <p v-if="resendMessage" class="guidance" role="status">{{ resendMessage }}</p>
+        <p v-if="resendMessage" class="access-guidance" role="status">{{ resendMessage }}</p>
+        <RouterLink class="access-link access-back access-back--center" :to="{ name: 'login' }">
+          <img :src="arrowIcon" alt="" /> Voltar para entrar
+        </RouterLink>
+        <p class="access-guidance">A confirmação do email não contrata nem ativa um plano.</p>
       </template>
-      <form v-else novalidate :aria-busy="state === 'submitting'" @submit.prevent="submit">
-        <div class="fields">
+      <form v-else class="access-form" novalidate :aria-busy="state === 'submitting'" @submit.prevent="submit">
+        <div class="access-fields">
           <label for="name"
             >Nome *
             <input
@@ -48,7 +61,7 @@ const { message: resendMessage, blocked: resendBlocked, resend } = useVerificati
               :aria-invalid="errors.name ? true : undefined"
               :aria-describedby="errors.name ? 'name-error' : undefined"
             />
-            <span v-if="errors.name" id="name-error" class="error" role="alert">{{ errors.name }}</span>
+            <span v-if="errors.name" id="name-error" class="access-error" role="alert">{{ errors.name }}</span>
           </label>
           <label for="email"
             >E-mail *
@@ -62,7 +75,7 @@ const { message: resendMessage, blocked: resendBlocked, resend } = useVerificati
               :aria-invalid="errors.email ? true : undefined"
               :aria-describedby="errors.email ? 'email-error' : undefined"
             />
-            <span v-if="errors.email" id="email-error" class="error" role="alert">{{ errors.email }}</span>
+            <span v-if="errors.email" id="email-error" class="access-error" role="alert">{{ errors.email }}</span>
           </label>
           <label for="password"
             >Senha *
@@ -76,7 +89,7 @@ const { message: resendMessage, blocked: resendBlocked, resend } = useVerificati
               :aria-invalid="errors.password ? true : undefined"
               :aria-describedby="errors.password ? 'password-error' : undefined"
             />
-            <span v-if="errors.password" id="password-error" class="error" role="alert">{{ errors.password }}</span>
+            <span v-if="errors.password" id="password-error" class="access-error" role="alert">{{ errors.password }}</span>
           </label>
           <label for="phone"
             >Celular (opcional)
@@ -90,27 +103,35 @@ const { message: resendMessage, blocked: resendBlocked, resend } = useVerificati
               :aria-invalid="errors.phone ? true : undefined"
               :aria-describedby="errors.phone ? 'phone-error' : undefined"
             />
-            <span v-if="errors.phone" id="phone-error" class="error" role="alert">{{ errors.phone }}</span>
+            <span v-if="errors.phone" id="phone-error" class="access-error" role="alert">{{ errors.phone }}</span>
           </label>
         </div>
-        <p class="guidance">
+        <p class="access-guidance">
           * Campos obrigatórios. Cadastro exclusivo para desenvolvedores freelancers.
         </p>
-        <p v-if="state === 'email-already-registered'" class="error" role="alert">
+        <p v-if="state === 'email-already-registered'" class="access-error" role="alert">
           Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.
         </p>
-        <p v-else-if="state === 'outcome-unknown'" class="error" role="alert">
+        <p v-else-if="state === 'outcome-unknown'" class="access-error" role="alert">
           Não conseguimos confirmar o resultado do cadastro. Tente novamente.
         </p>
-        <p v-else-if="state === 'error'" class="error" role="alert">
+        <p v-else-if="state === 'error'" class="access-error" role="alert">
           Não foi possível concluir a solicitação.
         </p>
-        <button type="submit" :disabled="state === 'submitting'">
+        <button class="access-action" type="submit" :disabled="state === 'submitting'">
           <span v-if="state === 'submitting'" class="spinner" aria-hidden="true"></span>
           {{ state === "submitting" ? "Criando conta…" : "Criar conta" }}
         </button>
       </form>
-      <details v-if="state !== 'success' && state !== 'email-unconfirmed'" class="resend">
+      <RouterLink
+        v-if="state !== 'success' && state !== 'email-unconfirmed'"
+        class="access-link access-back"
+        :to="{ name: 'login' }"
+      >
+        <img :src="arrowIcon" alt="" /> Voltar para entrar
+      </RouterLink>
+    </section>
+    <details v-if="state !== 'success' && state !== 'email-unconfirmed'" class="access-resend registration-resend">
         <summary>Reenviar link de confirmação</summary>
         <form @submit.prevent="resend(resendEmail)">
           <label for="resend-email">
@@ -125,130 +146,50 @@ const { message: resendMessage, blocked: resendBlocked, resend } = useVerificati
               :disabled="resendBlocked"
             />
           </label>
-          <button type="submit" :disabled="resendBlocked || !resendEmail.trim()">Reenviar</button>
-          <p v-if="resendMessage" class="guidance" role="status">{{ resendMessage }}</p>
+          <button class="access-action" type="submit" :disabled="resendBlocked || !resendEmail.trim()">Reenviar</button>
+          <p v-if="resendMessage" class="access-guidance" role="status">{{ resendMessage }}</p>
         </form>
       </details>
-      <p v-if="state !== 'success'" class="guidance">
-        Já tem uma conta? <RouterLink :to="{ name: 'login' }">Entre na sua conta</RouterLink>.
-      </p>
-    </section>
-  </main>
+
+  </AccessFrame>
 </template>
 
 <style scoped>
-.access-header {
-  min-height: 5rem;
-  padding: var(--espaco-md) var(--espaco-xl);
-  background: var(--superficie);
-  border-bottom: 1px solid var(--desabilitado);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--espaco-md);
+.confirmation-guidance {
+  margin-top: 0;
 }
-.brand {
-  font-size: var(--titulo-secao);
-  font-weight: 600;
+
+.confirmation-guidance p + p {
+  margin-top: var(--espaco-xs);
 }
-.tagline,
-.guidance {
-  font-size: var(--legenda);
-  color: var(--texto-suave);
+
+.registration-resend {
+  width: min(100%, 28rem);
+  text-align: center;
 }
-.registration {
-  padding: var(--espaco-xl) var(--espaco-md);
-  display: flex;
-  justify-content: center;
-}
-.registration-card {
-  width: 28rem;
-  max-width: 100%;
-  background: var(--superficie);
+
+.registration-resend form {
+  padding: var(--espaco-md);
   border: 1px solid var(--desabilitado);
-  border-radius: 0.5rem;
-  padding: var(--espaco-xl);
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-lg);
+  border-radius: var(--espaco-sm);
+  background: var(--superficie);
+  text-align: left;
 }
-h1 {
-  font-size: var(--titulo-pagina);
-  font-weight: 600;
-}
-.description {
-  color: var(--texto-suave);
-  margin-top: var(--espaco-sm);
-}
-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-lg);
-}
-.resend summary {
-  color: var(--primaria);
-  cursor: pointer;
-}
-.resend form {
-  margin-top: var(--espaco-md);
-}
-.fields {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-md);
-}
-label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-sm);
-  font-size: var(--legenda);
-}
-input {
+
+.registration-resend :is(label, input) {
+  display: block;
   width: 100%;
+}
+
+.registration-resend input {
   min-height: 2.5rem;
-  padding: var(--espaco-sm) var(--espaco-md);
+  margin-top: var(--espaco-sm);
+  padding: 0 var(--espaco-md);
   border: 1px solid var(--desabilitado);
-  border-radius: 0.25rem;
-  background: var(--superficie);
-  color: var(--texto);
+  border-radius: var(--espaco-xs);
   font: inherit;
-  font-size: var(--corpo);
 }
-button {
-  min-height: 2.5rem;
-  padding: var(--espaco-sm) var(--espaco-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--espaco-sm);
-  border: 0;
-  border-radius: 0.25rem;
-  background: var(--primaria);
-  color: var(--superficie);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-button:hover:enabled {
-  background: var(--primaria-hover);
-}
-button:disabled {
-  background: var(--desabilitado);
-  color: var(--texto-suave);
-  cursor: wait;
-}
-input:focus-visible,
-button:focus-visible,
-summary:focus-visible {
-  outline: 2px solid var(--primaria);
-  outline-offset: 3px;
-}
-.success {
-  color: var(--sucesso);
-}
-.error {
-  color: var(--perigo);
-}
+
 .spinner {
   width: 1rem;
   height: 1rem;
@@ -257,25 +198,16 @@ summary:focus-visible {
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation: none;
-  }
-}
-@media (max-width: 40rem) {
-  .access-header {
-    padding: var(--espaco-md);
-  }
-  .tagline {
-    display: none;
-  }
-  .registration-card {
-    padding: var(--espaco-md);
   }
 }
 </style>

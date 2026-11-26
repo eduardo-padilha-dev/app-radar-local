@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import { RouterLink, useRoute } from "vue-router";
+import AccessFrame from "./AccessFrame.vue";
+import arrowIcon from "./assets/arrow-left.svg";
+import alertIcon from "./assets/circle-alert.svg";
+import checkIcon from "./assets/circle-check.svg";
 import { useEmailVerification } from "./useEmailVerification";
 import { useVerificationResend } from "./useVerificationResend";
 
@@ -8,6 +12,8 @@ const route = useRoute();
 const { state, confirm } = useEmailVerification();
 const resendEmail = ref("");
 const { message: resendMessage, blocked: resendBlocked, resend } = useVerificationResend();
+const confirmed = computed(() => state.value === "confirmed" || state.value === "already-confirmed");
+const invalid = computed(() => state.value === "invalid" || state.value === "expired");
 
 function confirmLink() {
   return confirm(route.query.token);
@@ -17,153 +23,83 @@ onMounted(confirmLink);
 </script>
 
 <template>
-  <header class="access-header">
-    <span class="brand">Radar Local</span>
-  </header>
-  <main class="email-verification">
-    <section class="verification-card" aria-labelledby="verification-title">
-      <h1 id="verification-title">Confirmação de e-mail</h1>
+  <AccessFrame variant="verification-result">
+    <section class="access-card access-card--result" aria-labelledby="verification-title">
+      <h1 id="verification-title">
+        {{ confirmed ? "Email confirmado" : invalid ? "Link inválido ou expirado" : "Confirmação de e-mail" }}
+      </h1>
       <p v-if="state === 'idle' || state === 'confirming'" role="status">Confirmando seu e-mail…</p>
-      <p v-else-if="state === 'confirmed'" class="success" role="status">E-mail confirmado</p>
-      <p v-else-if="state === 'already-confirmed'" class="success" role="status">
-        E-mail já confirmado
-      </p>
-      <p v-else-if="state === 'invalid'" class="error" role="alert">
-        O link de confirmação é inválido.
-      </p>
-      <template v-else-if="state === 'expired'">
-        <p class="error" role="alert">O link de confirmação expirou.</p>
-        <details class="resend">
-          <summary>Reenviar link de confirmação</summary>
-          <form @submit.prevent="resend(resendEmail)">
-            <label for="resend-email">E-mail</label>
-            <input
-              id="resend-email"
-              v-model="resendEmail"
-              type="email"
-              name="email"
-              autocomplete="email"
-              required
-              :disabled="resendBlocked"
-            />
-            <button type="submit" :disabled="resendBlocked || !resendEmail.trim()">Reenviar</button>
-            <p v-if="resendMessage" role="status">{{ resendMessage }}</p>
-          </form>
-        </details>
+      <template v-else-if="confirmed">
+        <div class="access-note">
+          <img :src="checkIcon" alt="" />
+          <div>
+            <p class="access-success" role="status">
+              {{ state === "confirmed" ? "E-mail confirmado" : "E-mail já confirmado" }}
+            </p>
+            <p>Sua conta está pronta para usar a busca disponível para você.</p>
+          </div>
+        </div>
+        <p>Confirmar o email não ativa um plano pago.</p>
+        <RouterLink class="access-action verification-primary" :to="{ name: 'login' }">
+          Entrar na conta
+        </RouterLink>
+      </template>
+      <template v-else-if="invalid">
+        <div class="access-note">
+          <img :src="alertIcon" alt="" />
+          <div>
+            <p class="access-error" role="alert">
+              {{ state === "expired" ? "O link de confirmação expirou." : "O link de confirmação é inválido." }}
+            </p>
+            <p v-if="state === 'expired'">Solicite um novo link para confirmar sua conta.</p>
+          </div>
+        </div>
+        <template v-if="state === 'expired'">
+          <p>O novo link é único e válido por 24 horas.</p>
+          <details class="access-resend">
+            <summary class="access-action verification-primary">Reenviar link de confirmação</summary>
+            <form @submit.prevent="resend(resendEmail)">
+              <label for="resend-email">
+                E-mail
+                <input
+                  id="resend-email"
+                  v-model="resendEmail"
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  required
+                  :disabled="resendBlocked"
+                />
+              </label>
+              <button class="access-action" type="submit" :disabled="resendBlocked || !resendEmail.trim()">
+                Reenviar
+              </button>
+              <p v-if="resendMessage" class="access-guidance" role="status">{{ resendMessage }}</p>
+            </form>
+          </details>
+        </template>
+        <RouterLink class="access-link access-back access-back--center" :to="{ name: 'login' }">
+          <img :src="arrowIcon" alt="" /> Voltar para entrar
+        </RouterLink>
       </template>
       <template v-else>
-        <p class="error" role="alert">Não foi possível confirmar o e-mail.</p>
-        <button class="retry" type="button" @click="confirmLink">Tentar novamente</button>
+        <p class="access-error" role="alert">Não foi possível confirmar o e-mail.</p>
+        <button class="access-action verification-primary" type="button" @click="confirmLink">
+          Tentar novamente
+        </button>
       </template>
     </section>
-  </main>
+  </AccessFrame>
 </template>
 
 <style scoped>
-.access-header {
-  min-height: 5rem;
-  padding: var(--espaco-md) var(--espaco-xl);
-  background: var(--superficie);
-  border-bottom: 1px solid var(--desabilitado);
-  display: flex;
-  align-items: center;
+.verification-primary {
+  align-self: flex-start;
+  width: fit-content;
 }
-.brand {
-  font-size: var(--titulo-secao);
-  font-weight: 600;
-}
-.email-verification {
-  padding: var(--espaco-xl) var(--espaco-md);
-  display: flex;
-  justify-content: center;
-}
-.verification-card {
-  width: 28rem;
-  max-width: 100%;
-  background: var(--superficie);
-  border: 1px solid var(--desabilitado);
-  border-radius: 0.5rem;
-  padding: var(--espaco-xl);
-}
-h1 {
-  font-size: var(--titulo-pagina);
-  font-weight: 600;
-  margin-bottom: var(--espaco-md);
-}
-.success {
-  color: var(--sucesso);
-}
-.error {
-  color: var(--perigo);
-}
-.retry {
-  margin-top: var(--espaco-md);
-  min-height: 2.5rem;
-  padding: var(--espaco-sm) var(--espaco-md);
-  border: 0;
-  border-radius: 0.25rem;
-  background: var(--primaria);
+.access-resend summary {
+  display: inline-flex;
   color: var(--superficie);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.retry:hover {
-  background: var(--primaria-hover);
-}
-.retry:focus-visible {
-  outline: 2px solid var(--primaria);
-  outline-offset: 3px;
-}
-.resend {
-  margin-top: var(--espaco-md);
-}
-.resend summary {
-  color: var(--primaria);
-  cursor: pointer;
-}
-.resend summary:focus-visible {
-  outline: 2px solid var(--primaria);
-  outline-offset: 3px;
-}
-.resend form {
-  margin-top: var(--espaco-md);
-  display: grid;
-  gap: var(--espaco-sm);
-}
-.resend input,
-.resend button {
-  min-height: 2.5rem;
-  padding: var(--espaco-sm) var(--espaco-md);
-  border: 1px solid var(--desabilitado);
-  border-radius: 0.25rem;
-  background: var(--superficie);
-  color: var(--texto);
-  font: inherit;
-}
-.resend button:enabled {
-  background: var(--primaria);
-  color: var(--superficie);
-  font-weight: 600;
-  cursor: pointer;
-}
-.resend button:hover:enabled {
-  background: var(--primaria-hover);
-}
-.resend input:disabled,
-.resend button:disabled {
-  background: var(--desabilitado);
-  color: var(--texto-suave);
-}
-.resend input:focus-visible,
-.resend button:focus-visible {
-  outline: 2px solid var(--primaria);
-  outline-offset: 3px;
-}
-@media (max-width: 40rem) {
-  .access-header,
-  .verification-card {
-    padding: var(--espaco-md);
-  }
+  text-decoration: none;
 }
 </style>
