@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/common/configure-app.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 import { ResendEmailService } from '../src/integrations/resend/resend-email.service.js';
+import { SearchEmailEligibilityService } from '../src/modules/auth/search-email-eligibility.service.js';
 import { requireTestDatabaseUrl } from './setup-database.js';
 
 vi.hoisted(() => {
@@ -159,6 +160,37 @@ describe('email verification', () => {
       });
 
     await expectUnchangedState(user, verification);
+  });
+
+  it('blocks a pending email before continuing a search and allows the confirmed account to continue', async () => {
+    const { token, user, verification } = await registerAndReadState();
+    expect(user.emailVerifiedAt).toBeNull();
+    expect(user.demoUsedAt).toBeNull();
+
+    const eligibility = app.get(SearchEmailEligibilityService);
+    const evaluateRemainingConditions = vi.fn();
+    const attemptSearch = async () => {
+      await eligibility.assertEmailVerified(user.id);
+      evaluateRemainingConditions();
+    };
+
+    await expect(attemptSearch()).rejects.toMatchObject({
+      publicError: { code: 'EMAIL_VERIFICATION_REQUIRED' },
+    });
+    expect(evaluateRemainingConditions).not.toHaveBeenCalled();
+    await expectUnchangedState(user, verification);
+
+    await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send({ token })
+      .expect(200, { data: { status: 'confirmed' } });
+
+    await attemptSearch();
+    expect(evaluateRemainingConditions).toHaveBeenCalledTimes(1);
+    const confirmedUser = await prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+    });
+    expect(confirmedUser.demoUsedAt).toBeNull();
   });
 
   it('documents invalid and expired link errors in OpenAPI', async () => {

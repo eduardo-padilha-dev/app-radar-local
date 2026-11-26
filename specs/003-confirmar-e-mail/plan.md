@@ -22,7 +22,7 @@
   - Teste primeiro: testar token ausente, malformado, desconhecido, associado a outro endereço e exatamente no limite de 24 horas. Verificar respostas distintas para expiração e invalidade, sem mudar o estado persistido. A interface deve distinguir os resultados e exibir a opção de reenvio para o expirado. A emissão real pelo botão entra na tarefa 5. O RED vem das respostas ou estados ainda ausentes.
   - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.controller.ts,auth.service.ts,dto/verify-email.dto.ts}`, `apps/api/src/common/api-exception.filter.ts`, `apps/web/src/features/auth/{VerifyEmailPage.vue,VerifyEmailPage.spec.ts,email-verification.service.ts,useEmailVerification.ts}`.
 
-- [ ] **Tarefa 3 — Recusar busca com e-mail pendente**
+- [x] **Tarefa 3 — Recusar busca com e-mail pendente**
   - Cobre: CA3.
   - Teste primeiro: com uma conta real no banco de testes, executar a regra a partir da tentativa de acesso. Exigir recusa específica antes da etapa que continuaria a busca e conferir `demoUsedAt` no banco. Confirmar o e-mail e repetir para provar que o fluxo pode avaliar as demais condições. O RED vem da ausência da regra de acesso.
   - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.module.ts,search-email-eligibility.service.ts}`.
