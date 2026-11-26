@@ -21,6 +21,11 @@ const router = createRouter({
       name: "register",
       component: () => import("../../features/auth/RegisterPage.vue"),
     },
+    {
+      path: "/confirmar-email",
+      name: "verify-email",
+      component: () => import("../../features/auth/VerifyEmailPage.vue"),
+    },
   ],
 });
 

@@ -12,10 +12,10 @@
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Confirmar e-mail ao abrir link válido**
+- [x] **Tarefa 1 — Confirmar e-mail ao abrir link válido**
   - Cobre: CA1.
   - Teste primeiro: emitir um link pelo cadastro e abri-lo pela rota real com a API de teste ou transporte controlado no teste de interface. O teste HTTP deve confirmar o e-mail, marcar o token como usado na mesma operação, preservar o estado da demonstração e comprovar que a resposta não inicia sessão. Simular falha de gravação para verificar que as duas alterações são revertidas juntas. O teste de interface deve mostrar “E-mail confirmado”. O RED vem da ausência da rota, da operação e da página.
-  - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.controller.ts,auth.service.ts,verification-token.ts,dto/verify-email.dto.ts,dto/email-verification-result.dto.ts}`, `apps/web/src/app/router/index.ts`, `apps/web/src/features/auth/{VerifyEmailPage.vue,VerifyEmailPage.spec.ts,email-verification.service.ts}`.
+  - Arquivos previstos: `apps/api/test/email-verification.e2e-spec.ts`, `apps/api/src/modules/auth/{auth.controller.ts,auth.service.ts,verification-token.ts,dto/verify-email.dto.ts,dto/email-verification-result.dto.ts}`, `apps/web/src/app/router/index.ts`, `apps/web/src/features/auth/{VerifyEmailPage.vue,VerifyEmailPage.spec.ts,email-verification.service.ts,useEmailVerification.ts}`, `apps/web/index.html`, `apps/web/vite.config.ts`.
 
 - [ ] **Tarefa 2 — Informar por que o link não pode ser usado**
   - Cobre: CA2.

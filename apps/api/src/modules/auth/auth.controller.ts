@@ -1,13 +1,25 @@
-import { Body, Controller, Inject, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Post,
+} from '@nestjs/common';
 import {
   ApiBadGatewayResponse,
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiExtraModels,
+  ApiOkResponse,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service.js';
+import { EmailVerificationResult } from './dto/email-verification-result.dto.js';
+import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { RegistrationResult } from './dto/registration-result.dto.js';
 
@@ -88,5 +100,22 @@ export class AuthController {
   })
   register(@Body() input: RegisterDto): Promise<RegistrationResult> {
     return this.auth.register(input);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiBody({ type: VerifyEmailDto })
+  @ApiExtraModels(EmailVerificationResult)
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['data'],
+      properties: {
+        data: { $ref: getSchemaPath(EmailVerificationResult) },
+      },
+    },
+  })
+  verifyEmail(@Body() input: VerifyEmailDto): Promise<EmailVerificationResult> {
+    return this.auth.verifyEmail(input.token);
   }
 }

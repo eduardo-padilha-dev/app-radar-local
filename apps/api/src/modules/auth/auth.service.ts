@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../../../generated/prisma/client.js';
 import { PrismaService } from '../../database/prisma.service.js';
@@ -6,6 +6,7 @@ import { ResendEmailService } from '../../integrations/resend/resend-email.servi
 import { PasswordHasher } from './password-hasher.js';
 import { VerificationEmailUnconfirmedException } from './verification-email-unconfirmed.exception.js';
 import { VerificationToken } from './verification-token.js';
+import type { EmailVerificationResult } from './dto/email-verification-result.dto.js';
 import type { RegisterDto } from './dto/register.dto.js';
 import type { RegistrationResult } from './dto/registration-result.dto.js';
 
@@ -71,5 +72,47 @@ export class AuthService {
       throw new VerificationEmailUnconfirmedException(cause);
     }
     return { accountCreated: true, verificationEmailStatus: 'accepted' };
+  }
+
+  async verifyEmail(token: string): Promise<EmailVerificationResult> {
+    const tokenHash = this.tokens.hash(token);
+
+    return this.prisma.$transaction<EmailVerificationResult>(async (tx) => {
+      const candidate = await tx.emailVerification.findUnique({
+        where: { tokenHash },
+        select: { userId: true },
+      });
+      if (!candidate) throw new NotFoundException();
+
+      // Lock the account before reading the state shared by confirmation and issuance.
+      await tx.$queryRaw`
+        SELECT id FROM users WHERE id = ${candidate.userId}::uuid FOR UPDATE
+      `;
+
+      const verification = await tx.emailVerification.findUnique({
+        where: { tokenHash, userId: candidate.userId },
+        include: { user: { select: { email: true, emailVerifiedAt: true } } },
+      });
+      const now = new Date(Date.now());
+      if (
+        !verification ||
+        verification.email !== verification.user.email ||
+        verification.usedAt !== null ||
+        verification.user.emailVerifiedAt !== null ||
+        verification.expiresAt <= now
+      ) {
+        throw new NotFoundException();
+      }
+
+      await tx.user.update({
+        where: { id: verification.userId },
+        data: { emailVerifiedAt: now },
+      });
+      await tx.emailVerification.update({
+        where: { id: verification.id },
+        data: { usedAt: now },
+      });
+      return { status: 'confirmed' };
+    });
   }
 }

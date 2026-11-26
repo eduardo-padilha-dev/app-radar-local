@@ -1,0 +1,138 @@
+import { randomUUID } from 'node:crypto';
+import type { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import request from 'supertest';
+import { AppModule } from '../src/app.module.js';
+import { configureApp } from '../src/common/configure-app.js';
+import { PrismaService } from '../src/database/prisma.service.js';
+import { ResendEmailService } from '../src/integrations/resend/resend-email.service.js';
+import { requireTestDatabaseUrl } from './setup-database.js';
+
+vi.hoisted(() => {
+  process.env.RESEND_API_KEY = 'test-key';
+  process.env.EMAIL_FROM = 'Radar Local <hello@example.com>';
+  process.env.WEB_URL = 'https://web.example';
+  process.env.CORS_ORIGIN = 'https://web.example';
+});
+
+describe('email verification', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let email: string;
+  const send = vi.fn<(to: string, link: string) => Promise<void>>();
+
+  beforeAll(async () => {
+    requireTestDatabaseUrl(process.env.DATABASE_URL);
+    const module = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(ResendEmailService)
+      .useValue({ sendVerificationEmail: send })
+      .compile();
+    app = module.createNestApplication();
+    configureApp(app);
+    await app.init();
+    prisma = module.get(PrismaService);
+  });
+
+  beforeEach(() => {
+    email = `verify-${randomUUID()}@example.com`;
+    send.mockReset();
+    send.mockResolvedValue(undefined);
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await prisma?.emailVerification.deleteMany({ where: { email } });
+    await prisma?.user.deleteMany({ where: { email } });
+  });
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  async function registerAndReadLink() {
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ name: 'Ana', email, password: 'same password' })
+      .expect(201);
+    expect(send).toHaveBeenCalledExactlyOnceWith(email, expect.any(String));
+    const link = new URL(send.mock.calls[0]![1]);
+    expect(link.pathname).toBe('/confirmar-email');
+    const token = link.searchParams.get('token');
+    expect(token).toBeTruthy();
+    return token;
+  }
+
+  it('confirms the email, consumes the link, preserves the demo and returns no session', async () => {
+    const issuedAt = new Date('2026-11-10T00:00:00.000Z');
+    const confirmedAt = new Date('2026-11-10T23:59:59.999Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(issuedAt.getTime());
+    const token = await registerAndReadLink();
+    const demoUsedAt = new Date('2026-11-09T00:00:00.000Z');
+    const user = await prisma.user.update({
+      where: { email },
+      data: { demoUsedAt },
+    });
+    const verification = await prisma.emailVerification.findFirstOrThrow({
+      where: { userId: user.id },
+    });
+    expect(user.emailVerifiedAt).toBeNull();
+    expect(verification.usedAt).toBeNull();
+
+    clock.mockReturnValue(confirmedAt.getTime());
+    const response = await request(app.getHttpServer())
+      .post('/auth/verify-email')
+      .send({ token })
+      .expect(200, { data: { status: 'confirmed' } });
+
+    expect(response.headers['set-cookie']).toBeUndefined();
+    expect(response.headers.authorization).toBeUndefined();
+    expect(
+      await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+    ).toEqual({
+      ...user,
+      emailVerifiedAt: confirmedAt,
+    });
+    expect(
+      await prisma.emailVerification.findUniqueOrThrow({
+        where: { id: verification.id },
+      }),
+    ).toEqual({ ...verification, usedAt: confirmedAt });
+  });
+
+  it('rolls back both updates if the database refuses to mark the link as used', async () => {
+    email = 'verify-rollback@example.com';
+    const token = await registerAndReadLink();
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const verification = await prisma.emailVerification.findFirstOrThrow({
+      where: { userId: user.id },
+    });
+
+    await prisma.$executeRaw`
+      ALTER TABLE email_verifications ADD CONSTRAINT reject_verification_use
+      CHECK ("usedAt" IS NULL OR email <> 'verify-rollback@example.com') NOT VALID
+    `;
+    try {
+      await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ token })
+        .expect(500, {
+          statusCode: 500,
+          code: 'INTERNAL_ERROR',
+          message: 'Erro interno do servidor.',
+        });
+    } finally {
+      await prisma.$executeRaw`
+        ALTER TABLE email_verifications DROP CONSTRAINT reject_verification_use
+      `;
+    }
+
+    expect(
+      await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+    ).toEqual(user);
+    expect(
+      await prisma.emailVerification.findUniqueOrThrow({
+        where: { id: verification.id },
+      }),
+    ).toEqual(verification);
+  });
+});
