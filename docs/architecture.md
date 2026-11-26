@@ -433,6 +433,17 @@ integral. Qualquer mudança de stack ou entidades exige atualização explícita
 | Domínio | Módulo (pasta) | Guard | Dados (repository) | US |
 | :--- | :--- | :--- | :--- | :--- |
 | Cadastro de desenvolvedor | `AuthModule` (`apps/api/src/modules/auth/`) | Rota pública | `PrismaService` (`User`, `EmailVerification`) | US01 |
+| Confirmação e reenvio de e-mail | `AuthModule` (`apps/api/src/modules/auth/`) | Rotas públicas | `PrismaService` (`User`, `EmailVerification`), adaptador Resend | US02 |
+
+A confirmação grava `User.emailVerifiedAt` e `EmailVerification.usedAt` na
+mesma transação. Confirmação e reenvio usam a mesma trava por conta. O reenvio
+registra o novo link antes de chamar o Resend, fora da transação, e responde
+com o mesmo resultado público aos pedidos com endereço válido.
+
+`SearchEmailEligibilityService`, exportado pelo `AuthModule`, consulta
+`User.emailVerifiedAt` para recusar buscas de contas pendentes. A US04 ligará
+essa verificação à busca antes das demais condições de acesso e de qualquer
+consumo da demonstração.
 
 ## 📅 7. Histórico
 

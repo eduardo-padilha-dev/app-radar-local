@@ -30,7 +30,7 @@ describe("registration page", () => {
       await page.get("#name").setValue("Ana");
       await page.get("#email").setValue("ana@example.com");
       await page.get("#password").setValue("same password");
-      await page.get("form").trigger("submit");
+      await page.get("form[novalidate]").trigger("submit");
       await flushPromises();
 
       expect(page.get("[role=alert]").text()).toBe(
@@ -38,11 +38,166 @@ describe("registration page", () => {
           ? "Sua conta foi criada, mas não conseguimos confirmar o envio do e-mail de confirmação. Tente reenviar o link."
           : "Não foi possível concluir a solicitação.",
       );
-      expect(page.find("form").exists()).toBe(!created);
+      expect(page.find("form[novalidate]").exists()).toBe(!created);
       expect(page.findAll("a")).toHaveLength(0);
       expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       page.unmount();
+    }
+  });
+
+  it("requests a new link on the registration page using the email already entered", async () => {
+    const email = "Ana@example.com";
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          code: "VERIFICATION_EMAIL_UNCONFIRMED",
+          details: { accountCreated: true, emailVerificationPending: true },
+        }),
+        { status: 502 },
+      ))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { retryAfterSeconds: 60 } }), { status: 202 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: existingRouter.options.routes,
+    });
+    await router.push("/criar-conta");
+    await router.isReady();
+    const page = mount(App, { global: { plugins: [router] } });
+    try {
+      await flushPromises();
+      await page.get("#name").setValue("Ana");
+      await page.get("#email").setValue(email);
+      await page.get("#password").setValue("same password");
+      await page.get("form[novalidate]").trigger("submit");
+      await flushPromises();
+
+      const resend = page.get("button");
+      expect(resend.text()).toBe("Reenviar link de confirmação");
+      await resend.trigger("click");
+      await flushPromises();
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        expect.stringMatching(/\/auth\/resend-verification$/),
+        expect.objectContaining({
+          method: "POST",
+          credentials: "omit",
+          body: JSON.stringify({ email }),
+        }),
+      );
+      expect(page.get("[role=status]").text()).toContain(
+        "Se houver uma conta pendente para este e-mail, verifique sua caixa de entrada.",
+      );
+      expect(page.get("[role=status]").text()).toContain("60 segundos");
+      expect(resend.attributes("disabled")).toBeDefined();
+    } finally {
+      page.unmount();
+    }
+  });
+
+  it("requests only a resend from a fresh registration page without prior data", async () => {
+    const email = "ana@example.com";
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { retryAfterSeconds: 60 } }), { status: 202 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: existingRouter.options.routes,
+    });
+    await router.push("/criar-conta");
+    await router.isReady();
+    const page = mount(App, { attachTo: document.body, global: { plugins: [router] } });
+    try {
+      await flushPromises();
+      expect(page.get<HTMLInputElement>("#email").element.value).toBe("");
+
+      const option = page.get("summary");
+      expect(option.text()).toBe("Reenviar link de confirmação");
+      option.element.click();
+      expect(page.get<HTMLDetailsElement>("details").element.open).toBe(true);
+
+      const input = page.get<HTMLInputElement>("#resend-email");
+      expect(input.element.value).toBe("");
+      await input.setValue(email);
+      const resend = page.get<HTMLButtonElement>('details button[type="submit"]');
+      resend.element.click();
+      await flushPromises();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(/\/auth\/resend-verification$/),
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ email }) }),
+      );
+      expect(page.get("[role=status]").text()).toBe(
+        "Se houver uma conta pendente para este e-mail, verifique sua caixa de entrada. Aguarde 60 segundos para tentar novamente.",
+      );
+      expect(resend.element.disabled).toBe(true);
+    } finally {
+      page.unmount();
+    }
+  });
+
+  it("allows another resend from registration 60 seconds after losing the response", async () => {
+    const email = "ana@example.com";
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          code: "VERIFICATION_EMAIL_UNCONFIRMED",
+          details: { accountCreated: true, emailVerificationPending: true },
+        }),
+        { status: 502 },
+      ))
+      .mockRejectedValueOnce(new TypeError("Connection lost"))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { retryAfterSeconds: 60 } }), { status: 202 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const page = mount(RegisterPage);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await page.get("#name").setValue("Ana");
+      await page.get("#email").setValue(email);
+      await page.get("#password").setValue("same password");
+      await page.get("form[novalidate]").trigger("submit");
+      await flushPromises();
+
+      const resend = page.get("button");
+      await resend.trigger("click");
+      await flushPromises();
+      expect(page.get("[role=status]").text()).toBe(
+        "Não foi possível receber a resposta da solicitação. Aguarde 60 segundos para tentar novamente.",
+      );
+      expect(resend.attributes("disabled")).toBeDefined();
+
+      await vi.advanceTimersByTimeAsync(59_999);
+      await resend.trigger("click");
+      expect(resend.attributes("disabled")).toBeDefined();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(resend.attributes("disabled")).toBeUndefined();
+      expect(page.get("[role=status]").text()).toBe(
+        "Não foi possível receber a resposta da solicitação.",
+      );
+      await resend.trigger("click");
+      await flushPromises();
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        expect.stringMatching(/\/auth\/resend-verification$/),
+        expect.objectContaining({ body: JSON.stringify({ email }) }),
+      );
+      expect(page.get("[role=status]").text()).toContain(
+        "Se houver uma conta pendente para este e-mail, verifique sua caixa de entrada.",
+      );
+      expect(resend.attributes("disabled")).toBeDefined();
+    } finally {
+      page.unmount();
+      vi.useRealTimers();
     }
   });
 
@@ -78,7 +233,7 @@ describe("registration page", () => {
         for (const [field, value] of Object.entries(input)) {
           await page.get(`#${field}`).setValue(value);
         }
-        await page.get("form").trigger("submit");
+        await page.get("form[novalidate]").trigger("submit");
         await flushPromises();
 
         expect(registeredEmails).toEqual(new Set([input.email]));
@@ -87,12 +242,12 @@ describe("registration page", () => {
           "Não conseguimos confirmar o resultado do cadastro. Tente novamente.",
         );
         expect(page.find("[role=status]").exists()).toBe(false);
-        expect(page.get("button[type=submit]").attributes("disabled")).toBeUndefined();
+        expect(page.get("form[novalidate] button[type=submit]").attributes("disabled")).toBeUndefined();
         for (const [field, value] of Object.entries(input)) {
           expect(page.get<HTMLInputElement>(`#${field}`).element.value).toBe(value);
         }
 
-        await page.get("form").trigger("submit");
+        await page.get("form[novalidate]").trigger("submit");
         await flushPromises();
 
         expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -124,14 +279,14 @@ describe("registration page", () => {
     await page.get("#name").setValue("Ana");
     await page.get("#email").setValue("ana@example.com");
     await page.get("#password").setValue("same password");
-    await page.get("form").trigger("submit");
+    await page.get("form[novalidate]").trigger("submit");
     await flushPromises();
 
     expect(page.get("[role=alert]").text()).toBe(
       "Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.",
     );
     expect(page.find("a").exists()).toBe(false);
-    expect(page.findAll("button").map((button) => button.attributes("type"))).toEqual(["submit"]);
+    expect(page.get("summary").text()).toBe("Reenviar link de confirmação");
     page.unmount();
   });
 
@@ -164,7 +319,7 @@ describe("registration page", () => {
     for (const [field, value] of Object.entries(values)) {
       await page.get<HTMLInputElement>(`#${field}`).setValue(value);
     }
-    page.get<HTMLButtonElement>("button[type=submit]").element.click();
+    page.get<HTMLButtonElement>("form[novalidate] button[type=submit]").element.click();
     await flushPromises();
 
     for (const [field, message] of [
@@ -183,7 +338,7 @@ describe("registration page", () => {
     expect(page.get("#phone").attributes("aria-invalid")).toBeUndefined();
     await page.get("#name").setValue("Ana");
     await page.get("#email").setValue("ana@example.com");
-    page.get<HTMLButtonElement>("button[type=submit]").element.click();
+    page.get<HTMLButtonElement>("form[novalidate] button[type=submit]").element.click();
     await flushPromises();
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -266,7 +421,7 @@ describe("registration page", () => {
     await router.isReady();
     const page = mount(App, { global: { plugins: [router] } });
     await flushPromises();
-    expect(page.findAll("form input").map((input) => input.attributes("name"))).toEqual([
+    expect(page.findAll("form[novalidate] input").map((input) => input.attributes("name"))).toEqual([
       "name",
       "email",
       "password",
@@ -275,11 +430,11 @@ describe("registration page", () => {
     expect(page.get('label[for="phone"]').text()).toBe("Celular (opcional)");
     expect(page.get("[name=phone]").attributes("required")).toBeUndefined();
     await page.get("[name=name]").setValue("Ana");
-    await page.get("[name=email]").setValue("ana@example.com");
+    await page.get("#email").setValue("ana@example.com");
     await page.get("[name=password]").setValue("same password");
-    await page.get("form").trigger("submit");
-    expect(page.get("button[type=submit]").attributes("disabled")).toBeDefined();
-    await page.get("form").trigger("submit");
+    await page.get("form[novalidate]").trigger("submit");
+    expect(page.get("form[novalidate] button[type=submit]").attributes("disabled")).toBeDefined();
+    await page.get("form[novalidate]").trigger("submit");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]).toEqual([
       expect.stringMatching(/\/auth\/register$/),

@@ -1,15 +1,37 @@
-import { Body, Controller, Inject, Post } from '@nestjs/common';
 import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Post,
+  UseFilters,
+} from '@nestjs/common';
+import {
+  ApiAcceptedResponse,
   ApiBadGatewayResponse,
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiExtraModels,
+  ApiGoneResponse,
+  ApiOkResponse,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
-import { AuthService } from './auth.service.js';
+import { ApiExceptionFilter } from '../../common/api-exception.filter.js';
+import {
+  AuthService,
+  expiredVerificationLink,
+  invalidVerificationLink,
+} from './auth.service.js';
+import { EmailVerificationResult } from './dto/email-verification-result.dto.js';
+import { VerifyEmailDto } from './dto/verify-email.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { RegistrationResult } from './dto/registration-result.dto.js';
+import { ResendVerificationDto } from './dto/resend-verification.dto.js';
+import { ResendVerificationResult } from './dto/resend-verification-result.dto.js';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -88,5 +110,77 @@ export class AuthController {
   })
   register(@Body() input: RegisterDto): Promise<RegistrationResult> {
     return this.auth.register(input);
+  }
+
+  @Post('verify-email')
+  @UseFilters(
+    new ApiExceptionFilter(({ token }) =>
+      token ? invalidVerificationLink : undefined,
+    ),
+  )
+  @ApiBadRequestResponse({
+    description: 'Link inválido ou corpo da solicitação inválido.',
+    schema: {
+      type: 'object',
+      required: ['statusCode', 'code', 'message'],
+      properties: {
+        statusCode: { type: 'integer', enum: [400] },
+        code: {
+          type: 'string',
+          enum: [invalidVerificationLink.code, 'VALIDATION_ERROR'],
+        },
+        message: { type: 'string' },
+      },
+    },
+  })
+  @ApiGoneResponse({
+    description: 'Link expirado.',
+    schema: {
+      type: 'object',
+      required: ['statusCode', 'code', 'message'],
+      properties: {
+        statusCode: { type: 'integer', enum: [410] },
+        code: { type: 'string', enum: [expiredVerificationLink.code] },
+        message: { type: 'string' },
+      },
+    },
+  })
+  @HttpCode(HttpStatus.OK)
+  @ApiBody({ type: VerifyEmailDto })
+  @ApiExtraModels(EmailVerificationResult)
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['data'],
+      properties: {
+        data: { $ref: getSchemaPath(EmailVerificationResult) },
+      },
+    },
+  })
+  verifyEmail(@Body() input: VerifyEmailDto): Promise<EmailVerificationResult> {
+    return this.auth.verifyEmail(input.token);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiBody({ type: ResendVerificationDto })
+  @ApiExtraModels(ResendVerificationResult)
+  @ApiAcceptedResponse({
+    description: 'Resposta genérica para uma solicitação de reenvio.',
+    schema: {
+      type: 'object',
+      required: ['data'],
+      properties: {
+        data: { $ref: getSchemaPath(ResendVerificationResult) },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'E-mail ou corpo da solicitação inválido.',
+  })
+  resendVerification(
+    @Body() input: ResendVerificationDto,
+  ): Promise<ResendVerificationResult> {
+    return this.auth.resendVerification(input.email);
   }
 }

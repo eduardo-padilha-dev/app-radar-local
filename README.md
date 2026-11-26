@@ -93,6 +93,12 @@ Abra o [cadastro](http://localhost:5173/criar-conta). A API atende em
 <http://localhost:3000>. Use `Ctrl+C` para parar cada servidor.
 `npm start` inicia a API sem watch.
 
+Para verificar a confirmação manualmente, cadastre um e-mail que você possa
+acessar e abra o link recebido. A página indica se o e-mail foi confirmado e,
+quando o link expirou, oferece o reenvio. Se o cadastro informar que o envio
+inicial ficou sem confirmação, solicite outro link nessa tela. A resposta ao
+pedido orienta a conferir a caixa de entrada sem garantir a entrega.
+
 ### Testes locais
 
 Com o PostgreSQL ativo, crie o banco separado uma vez por volume do Docker:
@@ -102,8 +108,8 @@ docker compose exec db createdb -U app appdb_test
 ```
 
 A suíte de integração usa `TEST_DATABASE_URL` e aplica as migrations ao banco de
-teste. O nome desse banco deve terminar em `_test`. Os testes de cadastro simulam
-o envio de e-mail.
+teste. O nome desse banco deve terminar em `_test`. Os testes de cadastro e confirmação
+simulam o envio de e-mail.
 
 Execute na raiz:
 

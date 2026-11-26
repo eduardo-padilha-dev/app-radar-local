@@ -1,6 +1,11 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useRegistration } from "./useRegistration";
+import { useVerificationResend } from "./useVerificationResend";
+
 const { fields, errors, state, submit } = useRegistration();
+const resendEmail = ref("");
+const { message: resendMessage, blocked: resendBlocked, resend } = useVerificationResend();
 </script>
 
 <template>
@@ -15,16 +20,20 @@ const { fields, errors, state, submit } = useRegistration();
         <p class="description">Organize sua prospecção em um só lugar.</p>
       </div>
       <template v-if="state === 'success'">
-        <!-- // TODO #3: conectar à confirmação e ao reenvio, incluindo falha do envio inicial. -->
         <p class="success" role="status">
           Conta criada. Confira seu e-mail para confirmar o cadastro.
         </p>
         <p class="guidance">Abra o link recebido para confirmar seu e-mail.</p>
       </template>
-      <!-- // TODO #3: conectar ao fluxo real de reenvio da confirmação. -->
-      <p v-else-if="state === 'email-unconfirmed'" class="error" role="alert">
-        Sua conta foi criada, mas não conseguimos confirmar o envio do e-mail de confirmação. Tente reenviar o link.
-      </p>
+      <template v-else-if="state === 'email-unconfirmed'">
+        <p class="error" role="alert">
+          Sua conta foi criada, mas não conseguimos confirmar o envio do e-mail de confirmação. Tente reenviar o link.
+        </p>
+        <button type="button" :disabled="resendBlocked" @click="resend(fields.email)">
+          Reenviar link de confirmação
+        </button>
+        <p v-if="resendMessage" class="guidance" role="status">{{ resendMessage }}</p>
+      </template>
       <form v-else novalidate :aria-busy="state === 'submitting'" @submit.prevent="submit">
         <div class="fields">
           <label for="name"
@@ -86,7 +95,6 @@ const { fields, errors, state, submit } = useRegistration();
         <p class="guidance">
           * Campos obrigatórios. Cadastro exclusivo para desenvolvedores freelancers.
         </p>
-        <!-- // TODO #3: conectar ao fluxo real de reenvio da confirmação. -->
         <!-- // TODO #4: conectar ao fluxo real de entrada. -->
         <p v-if="state === 'email-already-registered'" class="error" role="alert">
           Este e-mail já está cadastrado. Entre na sua conta ou solicite o reenvio da confirmação.
@@ -102,6 +110,25 @@ const { fields, errors, state, submit } = useRegistration();
           {{ state === "submitting" ? "Criando conta…" : "Criar conta" }}
         </button>
       </form>
+      <details v-if="state !== 'success' && state !== 'email-unconfirmed'" class="resend">
+        <summary>Reenviar link de confirmação</summary>
+        <form @submit.prevent="resend(resendEmail)">
+          <label for="resend-email">
+            E-mail
+            <input
+              id="resend-email"
+              v-model="resendEmail"
+              name="email"
+              type="email"
+              autocomplete="email"
+              required
+              :disabled="resendBlocked"
+            />
+          </label>
+          <button type="submit" :disabled="resendBlocked || !resendEmail.trim()">Reenviar</button>
+          <p v-if="resendMessage" class="guidance" role="status">{{ resendMessage }}</p>
+        </form>
+      </details>
       <!-- // TODO #4: conectar ao fluxo real de entrada. -->
       <p class="guidance">Já tem uma conta? A entrada estará disponível em breve.</p>
     </section>
@@ -157,6 +184,13 @@ form {
   flex-direction: column;
   gap: var(--espaco-lg);
 }
+.resend summary {
+  color: var(--primaria);
+  cursor: pointer;
+}
+.resend form {
+  margin-top: var(--espaco-md);
+}
 .fields {
   display: flex;
   flex-direction: column;
@@ -203,7 +237,8 @@ button:disabled {
   cursor: wait;
 }
 input:focus-visible,
-button:focus-visible {
+button:focus-visible,
+summary:focus-visible {
   outline: 2px solid var(--primaria);
   outline-offset: 3px;
 }

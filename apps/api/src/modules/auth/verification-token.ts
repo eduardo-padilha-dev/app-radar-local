@@ -7,8 +7,12 @@ export class VerificationToken {
     const token = randomBytes(32).toString('base64url');
     return {
       token,
-      tokenHash: createHash('sha256').update(token).digest('hex'),
+      tokenHash: this.hash(token),
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     };
+  }
+
+  hash(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 }
