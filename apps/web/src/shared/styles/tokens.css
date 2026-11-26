@@ -1,0 +1,37 @@
+:root {
+  --primaria: #2563eb;
+  --primaria-hover: #1d4ed8;
+  --fundo: #f8fafc;
+  --superficie: #ffffff;
+  --texto: #0f172a;
+  --texto-suave: #475569;
+  --perigo: #b91c1c;
+  --sucesso: #15803d;
+  --desabilitado: #e2e8f0;
+  --espaco-xs: 0.25rem;
+  --espaco-sm: 0.5rem;
+  --espaco-md: 1rem;
+  --espaco-lg: 1.5rem;
+  --espaco-xl: 2rem;
+  --titulo-pagina: 2rem;
+  --titulo-secao: 1.25rem;
+  --corpo: 1rem;
+  --legenda: 0.875rem;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 100%;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--texto);
+  background: var(--fundo);
+}
+* {
+  box-sizing: border-box;
+}
+body,
+h1,
+p {
+  margin: 0;
+}
+body {
+  min-width: 20rem;
+}
