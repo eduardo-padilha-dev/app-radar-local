@@ -27,7 +27,7 @@ Complemento para revisão. [Spec de autorização](complemento-autorizacao.md).
   - Teste primeiro. Fazer login com contas de teste dos dois papéis e usar os cookies emitidos em `GET /admin/access`. Esperar 204 sem corpo para administrador, 403 para desenvolvedor e 401 sem cookie válido. Verificar em `/docs-json` a autenticação por cookie e os três status documentados. A rota ainda não existe, então o caso administrativo deve falhar primeiro.
   - Arquivos previstos: `apps/api/src/modules/auth/admin-access.controller.ts`, `apps/api/src/modules/auth/auth.module.ts`, `apps/api/test/auth-session.e2e-spec.ts` e `apps/api/test/app.e2e-spec.ts`.
 
-- [ ] **Tarefa 4 — Verificar o fluxo pelo Swagger**
+- [x] **Tarefa 4 — Verificar o fluxo pelo Swagger**
   - Cobre a demonstração de CA11 e a navegação de CA9.
   - Validação. Com a API e o frontend locais, entrar como desenvolvedor e executar `GET /admin/access` pela página `/docs/` no mesmo navegador. Conferir o 403 para a captura. Confirmar que `npm test`, `npm run build` e `npm run lint` passam. Atualizar em `docs/architecture.md` o registro do guard global e a divisão entre acesso público, sessão própria e acesso administrativo.
   - Arquivo previsto: `docs/architecture.md`. A captura é evidência da atividade.
