@@ -14,6 +14,9 @@ import type { SessionProfile } from './dto/session-profile.dto.js';
 
 export const SESSION_COOKIE = 'radar_session';
 export const RequireRole = Reflector.createDecorator<Role>();
+export const PublicRoute = Reflector.createDecorator<void, boolean>({
+  transform: () => true,
+});
 
 export function readSessionCookie(req: Request): string | undefined {
   const prefix = SESSION_COOKIE + '=';
@@ -36,6 +39,8 @@ export class AuthSessionGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (this.reflector.get(PublicRoute, context.getHandler())) return true;
+
     const http = context.switchToHttp();
     const req = http.getRequest<AuthenticatedRequest>();
     http.getResponse<Response>().setHeader('Cache-Control', 'no-store');

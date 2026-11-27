@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { AdminAccessController } from './admin-access.controller.js';
 import { AuthSessionGuard } from './auth-session.guard.js';
 import { AuthSessionService } from './auth-session.service.js';
 import { AuthController } from './auth.controller.js';
@@ -24,7 +25,7 @@ import { VerificationToken } from './verification-token.js';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, AdminAccessController],
   providers: [
     AuthService,
     AuthSessionService,

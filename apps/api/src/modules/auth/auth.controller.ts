@@ -7,11 +7,12 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  Param,
+  ParseUUIDPipe,
   Post,
   Req,
   Res,
   UseFilters,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
@@ -29,6 +30,7 @@ import {
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
   getSchemaPath,
@@ -36,7 +38,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { CookieOptions, Request, Response } from 'express';
 import {
-  AuthSessionGuard,
+  PublicRoute,
   readSessionCookie,
   SESSION_COOKIE,
   type AuthenticatedRequest,
@@ -78,6 +80,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @PublicRoute()
   @ApiOperation({ summary: 'Inicia uma sessão' })
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
@@ -104,6 +107,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @PublicRoute()
   @ApiOperation({ summary: 'Encerra a sessão deste dispositivo' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Header('Cache-Control', 'no-store')
@@ -135,7 +139,6 @@ export class AuthController {
 
   @Get('session')
   @ApiOperation({ summary: 'Consulta a sessão atual' })
-  @UseGuards(AuthSessionGuard)
   @ApiCookieAuth()
   @ApiExtraModels(SessionProfile)
   @ApiOkResponse(sessionProfileResponse)
@@ -144,7 +147,38 @@ export class AuthController {
     return req.authenticatedUser;
   }
 
+  @Get('sessions/:id')
+  @ApiOperation({ summary: 'Consulta uma sessão da própria conta' })
+  @ApiCookieAuth()
+  @ApiParam({ name: 'id', schema: { type: 'string', format: 'uuid' } })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['data'],
+      properties: {
+        data: {
+          type: 'object',
+          required: ['id', 'expiresAt'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            expiresAt: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'UUID de sessão inválido.' })
+  @ApiUnauthorizedResponse({ description: 'Sessão ausente ou inválida.' })
+  @ApiNotFoundResponse({ description: 'Sessão não encontrada.' })
+  sessionDetails(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.sessions.getOwnedSession(id, req.authenticatedUser.id);
+  }
+
   @Post('register')
+  @PublicRoute()
   @ApiOperation({ summary: 'Cria uma conta de desenvolvedor' })
   @ApiBody({ type: RegisterDto })
   @ApiCreatedResponse({
@@ -220,6 +254,7 @@ export class AuthController {
   }
 
   @Post('verify-email')
+  @PublicRoute()
   @ApiOperation({ summary: 'Confirma o e-mail da conta' })
   @UseFilters(
     new ApiExceptionFilter(({ token }) =>
@@ -271,6 +306,7 @@ export class AuthController {
   }
 
   @Post('resend-verification')
+  @PublicRoute()
   @ApiOperation({ summary: 'Solicita outro e-mail de confirmação' })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiBody({ type: ResendVerificationDto })

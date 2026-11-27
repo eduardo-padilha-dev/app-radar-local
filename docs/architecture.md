@@ -107,18 +107,24 @@ Fontes: [NestJS 12](https://docs.nestjs.com/migration-guide),
   ValidationPipe global com `whitelist: true`, `forbidNonWhitelisted: true` e
   transformação explícita segundo os tipos. Mapear campos permitidos antes de
   persistir; papel e concessão de acesso são determinados pelo servidor.
-- **Autenticação — ID9:** JWT com `@nestjs/jwt` e Guard nas operações privadas.
-  Guard de papéis `DEVELOPER` e `ADMIN`. Verificar conta ativa e, quando aplicável,
-  confirmação de e-mail, acesso válido e propriedade no servidor.
+- **Autenticação — ID9:** JWT com `@nestjs/jwt`. O `AppModule` registra
+  `AuthSessionGuard` como `APP_GUARD`, então toda rota de controller NestJS
+  exige sessão válida por padrão. Cada operação pública declara
+  `@PublicRoute()` no próprio método. Para operações restritas por papel,
+  `@RequireRole()` é avaliado pelo guard com o papel atual carregado do servidor.
+  Os serviços aplicam as regras de propriedade, confirmação de e-mail e acesso
+  quando exigidas pela operação.
 - **Privacidade — RNF01:** consultas de histórico e acompanhamento delimitadas
   pelo proprietário autenticado, nunca por um proprietário informado pelo cliente.
   ADMIN não possui acesso universal: não consulta prospecção privada.
 - **Sessão — US03:** o JWT identifica a conta (`sub`) e a sessão (`sid`).
   A API o entrega em cookie `HttpOnly` restrito ao host, com `SameSite=Lax`,
   caminho `/` e `Secure` quando a requisição ou a origem web usa HTTPS.
-  O prazo de oito horas é fixado na entrada. A cada acesso privado, o Guard
-  verifica o token, a sessão persistida, a conta ativa e o perfil exigido.
-  Os POSTs de entrada e saída conferem a origem web configurada.
+  O prazo de oito horas é fixado na entrada. A cada acesso privado, o guard
+  verifica o JWT e consulta a sessão persistida para conferir validade,
+  revogação e conta ativa. Cookies ausentes ou inválidos resultam em HTTP 401
+  antes da execução do controller. Os POSTs de entrada e saída conferem a
+  origem web configurada.
 - **Senhas e tokens:** guardar hashes, sem texto original. Proposta técnica para
   ratificação na leitura: `node:crypto`, com `scrypt` e salt para senhas, geração
   aleatória e hash para confirmação, evitando biblioteca extra. Parâmetros e
@@ -167,7 +173,12 @@ Referências: [validação](https://docs.nestjs.com/techniques/validation),
 Swagger/OpenAPI gerado do código com `@nestjs/swagger`, servido pela API em
 `/docs`, documento JSON vivo em `/docs-json`. Serviços do frontend derivam seus
 contratos dessa fonte e adaptam tipos externos para os modelos das telas.
-Não manter tabela manual de endpoints nem commitar `swagger.json`.
+O Swagger é registrado fora das rotas dos controllers e pode ser consultado
+sem sessão. As operações protegidas de sessão e administração documentam o
+cookie `radar_session`. Na demonstração local, com o frontend e a API no
+mesmo hostname, o navegador envia o cookie emitido no login ao executar
+`GET /admin/access` em `/docs/`. Para uma sessão de desenvolvedor, a resposta
+é HTTP 403. Não manter tabela manual de endpoints nem commitar `swagger.json`.
 
 Referência: [OpenAPI no NestJS](https://docs.nestjs.com/openapi/introduction).
 
@@ -453,7 +464,9 @@ integral. Qualquer mudança de stack ou entidades exige atualização explícita
 | :--- | :--- | :--- | :--- | :--- |
 | Cadastro de desenvolvedor | `AuthModule` (`apps/api/src/modules/auth/`) | Rota pública | `PrismaService` (`User`, `EmailVerification`) | US01 |
 | Confirmação e reenvio de e-mail | `AuthModule` (`apps/api/src/modules/auth/`) | Rotas públicas | `PrismaService` (`User`, `EmailVerification`), adaptador Resend | US02 |
-| Entrada, sessão e saída | `AuthModule` (`apps/api/src/modules/auth/`) | `AuthSessionGuard` na consulta de sessão e nas rotas privadas | `PrismaService` (`User`, `AuthSession`) | US03 |
+| Entrada e saída | `AuthModule` (`apps/api/src/modules/auth/`) | `@PublicRoute()`, com validação de origem | `PrismaService` (`User`, `AuthSession`) | US03 |
+| Consulta da sessão atual e de sessão própria | `AuthModule` (`apps/api/src/modules/auth/`) | `AuthSessionGuard` global. A consulta por ID exige propriedade no serviço | `PrismaService` (`User`, `AuthSession`) | US03 |
+| Verificação de acesso administrativo | `AuthModule` (`apps/api/src/modules/auth/`) | `AuthSessionGuard` global com `@RequireRole(Role.ADMIN)` | `PrismaService` (`User`, `AuthSession`) | US03 |
 
 A confirmação grava `User.emailVerifiedAt` e `EmailVerification.usedAt` na
 mesma transação. Confirmação e reenvio usam a mesma trava por conta. O reenvio
@@ -471,6 +484,21 @@ por e-mail inexistente, senha incorreta ou conta desativada usam o mesmo
 revoga a sessão atual e responde `204` com a instrução para expirar o cookie,
 inclusive quando o pedido é repetido após perder a primeira resposta.
 As respostas de sessão usam `Cache-Control: no-store`.
+
+O controller raiz libera `GET /`. No `AuthModule`, cadastro, confirmação,
+reenvio, entrada e saída declaram `@PublicRoute()`. Na saída, uma origem
+permitida recebe HTTP 204 e a instrução para limpar o cookie mesmo quando
+ele estiver ausente, inválido ou expirado.
+
+`GET /auth/sessions/:id` consulta pelo UUID recebido e pelo ID da conta
+autenticada. Devolve apenas `id` e `expiresAt` de uma sessão ativa da própria
+conta. UUID malformado retorna HTTP 400. Sessões inexistentes, expiradas,
+revogadas ou de outra conta retornam o mesmo HTTP 404 para os dois papéis.
+
+`GET /admin/access` exige sessão válida e papel atual `ADMIN`. A API retorna
+HTTP 204 sem corpo para administrador, HTTP 403 para desenvolvedor com
+sessão válida e HTTP 401 quando a sessão é ausente ou inválida. Os três
+status constam no Swagger.
 
 No Vue, `/entrar` abre a sessão e o roteador consulta a API antes de mostrar
 `/area-privada`. A área aberta revalida a sessão ao recuperar o foco e
