@@ -10,6 +10,7 @@ import {
   UseGuards,
   type INestApplication,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { scrypt } from 'node:crypto';
 import request from 'supertest';
@@ -250,6 +251,52 @@ describe('account sessions (e2e)', () => {
       .set('Cookie', cookie);
   }
 
+  it('keeps a fixed eight-hour session and refuses the old cookie at the exact deadline', async () => {
+    const signedInAt = new Date('2026-11-26T13:00:00.437Z').getTime();
+    const expiresAt = signedInAt + 8 * 60 * 60 * 1000;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(signedInAt);
+      const response = await login(developerEmail).expect(200);
+      const [cookie, ...attributes] = sessionCookieHeader(response).split('; ');
+      expect(cookie).toMatch(/^radar_session=/);
+      const token = cookie.slice('radar_session='.length);
+      const { sid, exp } = app
+        .get(JwtService)
+        .decode<{ sid: string; exp: number }>(token);
+      const cookieExpiry = new Date(Math.ceil(expiresAt / 1000) * 1000);
+      expect(attributes.sort()).toEqual([
+        `Expires=${cookieExpiry.toUTCString()}`,
+        'HttpOnly',
+        'Path=/',
+        'SameSite=Lax',
+        'Secure',
+      ]);
+      expect(exp).toBe(expiresAt / 1000);
+      expect(
+        await prisma.authSession.findUniqueOrThrow({ where: { id: sid } }),
+      ).toMatchObject({ expiresAt: new Date(expiresAt) });
+
+      vi.setSystemTime(signedInAt + 4 * 60 * 60 * 1000);
+      const activity = await privateResource('developer', cookie).expect(200);
+      expect(activity.headers['set-cookie']).toBeUndefined();
+      expect(
+        await prisma.authSession.findUniqueOrThrow({ where: { id: sid } }),
+      ).toMatchObject({ expiresAt: new Date(expiresAt) });
+
+      vi.setSystemTime(expiresAt - 1);
+      await privateResource('developer', cookie).expect(200);
+      vi.setSystemTime(expiresAt);
+      await privateResource('developer', cookie).expect(401);
+      await request(app.getHttpServer())
+        .get('/auth/session')
+        .set('Cookie', cookie)
+        .expect(401);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it.each([
     { email: developerEmail, allowed: 'developer', denied: 'admin' },
     { email: adminEmail, allowed: 'admin', denied: 'developer' },
@@ -352,6 +399,10 @@ describe('account sessions (e2e)', () => {
 });
 
 function sessionCookie(response: Response) {
+  return sessionCookieHeader(response).split(';', 1)[0];
+}
+
+function sessionCookieHeader(response: Response) {
   const cookies: unknown = response.headers['set-cookie'];
   if (
     !Array.isArray(cookies) ||
@@ -360,5 +411,5 @@ function sessionCookie(response: Response) {
   ) {
     throw new Error('Expected one session cookie');
   }
-  return cookies[0].split(';', 1)[0];
+  return cookies[0];
 }

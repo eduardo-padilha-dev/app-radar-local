@@ -52,7 +52,7 @@ export class AuthSessionService {
 
   async authenticate(token: string): Promise<SessionProfile> {
     const { sub, sid } = await this.jwt
-      .verifyAsync<SessionClaims>(token)
+      .verifyAsync<SessionClaims>(token, { clockTimestamp: Date.now() / 1000 })
       .catch(() => {
         throw new UnauthorizedException();
       });

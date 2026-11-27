@@ -97,7 +97,8 @@ export class AuthController {
       sameSite: 'lax',
       secure: req.secure || allowedOrigin.protocol === 'https:',
       path: '/',
-      expires: expiresAt,
+      // Cookie dates use whole seconds. Keep the cookie through the server deadline.
+      expires: new Date(Math.ceil(expiresAt.getTime() / 1000) * 1000),
     });
     return profile;
   }

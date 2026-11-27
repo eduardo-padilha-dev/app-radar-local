@@ -31,7 +31,7 @@
   - Teste primeiro — uma conta persistida com e-mail pendente entra e alcança a área privada. A regra de elegibilidade recusa a busca para a identidade autenticada e deixa a demonstração intacta. Com e-mail confirmado, a regra permite verificar as demais condições. O teste exige a ligação do contexto autenticado ao serviço da US02.
   - Arquivos previstos — `apps/api/src/modules/auth/search-email-eligibility.service.ts` se a adaptação for necessária e `apps/api/test/auth-session.e2e-spec.ts`.
 
-- [ ] **Tarefa 5 — Expirar a sessão**
+- [x] **Tarefa 5 — Expirar a sessão**
   - Cobre CA4.
   - Teste primeiro — com relógio controlado, verificar os atributos do cookie e aceitar a sessão antes de oito horas. Atividade intermediária mantém a expiração original. No limite, o acesso privado com o cookie anterior retorna `401` e o Vue solicita novo login. O cenário falha enquanto faltar a política completa de expiração no fluxo.
   - Arquivos previstos — configuração de cookie e serviço de sessão da API, `apps/api/test/auth-session.e2e-spec.ts`, roteador, área privada e respectivos testes web.
