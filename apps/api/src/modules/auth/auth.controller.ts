@@ -7,6 +7,8 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  Param,
+  ParseUUIDPipe,
   Post,
   Req,
   Res,
@@ -28,6 +30,7 @@ import {
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
   getSchemaPath,
@@ -142,6 +145,36 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Sessão ausente ou inválida.' })
   session(@Req() req: AuthenticatedRequest): SessionProfile {
     return req.authenticatedUser;
+  }
+
+  @Get('sessions/:id')
+  @ApiOperation({ summary: 'Consulta uma sessão da própria conta' })
+  @ApiCookieAuth()
+  @ApiParam({ name: 'id', schema: { type: 'string', format: 'uuid' } })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['data'],
+      properties: {
+        data: {
+          type: 'object',
+          required: ['id', 'expiresAt'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            expiresAt: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'UUID de sessão inválido.' })
+  @ApiUnauthorizedResponse({ description: 'Sessão ausente ou inválida.' })
+  @ApiNotFoundResponse({ description: 'Sessão não encontrada.' })
+  sessionDetails(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.sessions.getOwnedSession(id, req.authenticatedUser.id);
   }
 
   @Post('register')

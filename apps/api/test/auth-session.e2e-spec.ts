@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
-import { scrypt } from 'node:crypto';
+import { randomUUID, scrypt } from 'node:crypto';
 import request from 'supertest';
 import type { Response } from 'supertest';
 import type { App } from 'supertest/types.js';
@@ -211,6 +211,79 @@ describe('account sessions (e2e)', () => {
         .expect({ data: profile });
     },
   );
+
+  function sessionDetails(id: string, cookie?: string) {
+    const resource = request(app.getHttpServer()).get('/auth/sessions/' + id);
+    if (cookie) resource.set('Cookie', cookie);
+    return resource;
+  }
+
+  it('returns only the ID and expiry of an active session owned by the account', async () => {
+    const cookie = sessionCookie(await login(developerEmail).expect(200));
+    const { id: userId } = await prisma.user.findUniqueOrThrow({
+      where: { email: developerEmail },
+      select: { id: true },
+    });
+    const { id, expiresAt } = await prisma.authSession.create({
+      data: {
+        id: randomUUID(),
+        userId,
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    await sessionDetails(id, cookie)
+      .expect(200)
+      .expect({ data: { id, expiresAt: expiresAt.toISOString() } });
+  });
+
+  it('returns the same 404 for missing, expired, revoked, and other accounts’ sessions', async () => {
+    const cookie = sessionCookie(await login(developerEmail).expect(200));
+    const adminCookie = sessionCookie(await login(adminEmail).expect(200));
+    const [{ id: userId }, { id: otherUserId }] = await Promise.all([
+      prisma.user.findUniqueOrThrow({
+        where: { email: developerEmail },
+        select: { id: true },
+      }),
+      prisma.user.findUniqueOrThrow({
+        where: { email: otherDeveloperEmail },
+        select: { id: true },
+      }),
+    ]);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 60_000);
+    const [expired, revoked, other] = await Promise.all([
+      prisma.authSession.create({
+        data: { id: randomUUID(), userId, expiresAt: now },
+      }),
+      prisma.authSession.create({
+        data: { id: randomUUID(), userId, expiresAt, revokedAt: now },
+      }),
+      prisma.authSession.create({
+        data: { id: randomUUID(), userId: otherUserId, expiresAt },
+      }),
+    ]);
+
+    const missingId = randomUUID();
+    const missing = await sessionDetails(missingId, cookie).expect(404);
+    for (const session of [expired, revoked, other]) {
+      const response = await sessionDetails(session.id, cookie).expect(404);
+      expect(response.body).toEqual(missing.body);
+    }
+
+    const adminOther = await sessionDetails(other.id, adminCookie).expect(404);
+    expect(adminOther.body).toEqual(missing.body);
+  });
+
+  it('rejects an invalid session UUID for an authenticated account', async () => {
+    const cookie = sessionCookie(await login(developerEmail).expect(200));
+
+    await sessionDetails('invalid-uuid', cookie).expect(400);
+  });
+
+  it('requires authentication to read session details', async () => {
+    await sessionDetails(randomUUID()).expect(401);
+  });
 
   it.each([
     {

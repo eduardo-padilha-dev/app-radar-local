@@ -1,4 +1,9 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { isUUID } from 'class-validator';
 import { randomUUID } from 'node:crypto';
@@ -95,6 +100,21 @@ export class AuthSessionService {
     if (!session) throw new UnauthorizedException();
 
     return session.user;
+  }
+
+  async getOwnedSession(id: string, userId: string) {
+    const session = await this.prisma.authSession.findFirst({
+      where: {
+        id,
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true, expiresAt: true },
+    });
+    if (!session) throw new NotFoundException();
+
+    return session;
   }
 
   async logout(token: string | undefined): Promise<void> {
