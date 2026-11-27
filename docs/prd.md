@@ -97,7 +97,9 @@ liberar o acesso às buscas do Radar Local.
 
 **Regras relacionadas:** RN02, RN03, RN06.
 
-### US03 — Entrar e sair da conta · `Must Have` · `S` · Status: `🟡 Ready`
+<a name="us03--entrar-e-sair-da-conta--must-have--s--status--ready"></a>
+
+### US03 — Entrar e sair da conta · `Must Have` · `S` · Status: `🟢 Live`
 
 **Como** usuário cadastrado, **eu quero** entrar e sair da minha conta **para que**
 eu possa acessar minhas funções com privacidade.

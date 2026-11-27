@@ -113,10 +113,12 @@ Fontes: [NestJS 12](https://docs.nestjs.com/migration-guide),
 - **Privacidade — RNF01:** consultas de histórico e acompanhamento delimitadas
   pelo proprietário autenticado, nunca por um proprietário informado pelo cliente.
   ADMIN não possui acesso universal: não consulta prospecção privada.
-- **Sessão — US03:** a entrada entrega o JWT em cookie `HttpOnly` e persiste
-  a sessão por oito horas. A cada acesso privado, o Guard valida o JWT, a
-  sessão persistida e o estado atual da conta. O encerramento por logout e a
-  revogação na desativação seguem os critérios da US03.
+- **Sessão — US03:** o JWT identifica a conta (`sub`) e a sessão (`sid`).
+  A API o entrega em cookie `HttpOnly` restrito ao host, com `SameSite=Lax`,
+  caminho `/` e `Secure` quando a requisição ou a origem web usa HTTPS.
+  O prazo de oito horas é fixado na entrada. A cada acesso privado, o Guard
+  verifica o token, a sessão persistida, a conta ativa e o perfil exigido.
+  Os POSTs de entrada e saída conferem a origem web configurada.
 - **Senhas e tokens:** guardar hashes, sem texto original. Proposta técnica para
   ratificação na leitura: `node:crypto`, com `scrypt` e salt para senhas, geração
   aleatória e hash para confirmação, evitando biblioteca extra. Parâmetros e
@@ -389,8 +391,12 @@ erDiagram
 
 Cada usuário pode ter várias sessões. Uma entrada bem-sucedida cria uma sessão
 com identificador aleatório e prazo fixo em `expiresAt`. A sessão perde a
-validade no vencimento ou quando `revokedAt` é preenchido. A exclusão do usuário
-remove suas sessões em cascata.
+validade no vencimento ou quando `revokedAt` é preenchido. O logout revoga
+só a sessão identificada pelo cookie. A operação interna de desativação
+atualiza `User.isActive` e revoga as sessões da conta na mesma transação.
+O login revalida a conta ativa sob bloqueio da mesma linha antes de criar
+a sessão. Reativar a conta permite uma nova entrada e mantém a revogação
+das sessões anteriores. A exclusão do usuário remove suas sessões em cascata.
 
 Unicidades compostas: `establishments(source, sourceId)`,
 `search_results(userId, establishmentId)` e `payments(provider, providerPaymentId)`
@@ -434,7 +440,6 @@ Variáveis previstas, sem valores: `DATABASE_URL`, `DIRECT_URL` quando necessár
 | :--- | :--- |
 | Preço, cotas, unidade de consumo e efeitos de filtros/falhas | PRD §9, antes de busca/contratação; dimensionar Places e Place Details |
 | Prazo de expiração do pedido e suporte para confirmação ausente | Spec US08; sair da página não cancela pedido |
-| Encerramento da sessão atual e revogação das sessões na desativação | Tarefas de logout e desativação da US03 |
 | Redefinição administrativa de senha | PRD §9, antes da gestão de usuários |
 | Domínio remetente e DNS no Resend | Antes do envio para usuários reais; domínio de teste tem destinatários restritos |
 | Hospedagem da API e web | Deploy; avaliar proximidade do banco Neon |
@@ -448,6 +453,7 @@ integral. Qualquer mudança de stack ou entidades exige atualização explícita
 | :--- | :--- | :--- | :--- | :--- |
 | Cadastro de desenvolvedor | `AuthModule` (`apps/api/src/modules/auth/`) | Rota pública | `PrismaService` (`User`, `EmailVerification`) | US01 |
 | Confirmação e reenvio de e-mail | `AuthModule` (`apps/api/src/modules/auth/`) | Rotas públicas | `PrismaService` (`User`, `EmailVerification`), adaptador Resend | US02 |
+| Entrada, sessão e saída | `AuthModule` (`apps/api/src/modules/auth/`) | `AuthSessionGuard` na consulta de sessão e nas rotas privadas | `PrismaService` (`User`, `AuthSession`) | US03 |
 
 A confirmação grava `User.emailVerifiedAt` e `EmailVerification.usedAt` na
 mesma transação. Confirmação e reenvio usam a mesma trava por conta. O reenvio
@@ -458,6 +464,19 @@ com o mesmo resultado público aos pedidos com endereço válido.
 `User.emailVerifiedAt` para recusar buscas de contas pendentes. A US04 ligará
 essa verificação à busca antes das demais condições de acesso e de qualquer
 consumo da demonstração.
+
+`POST /auth/login` inicia a sessão e responde com o perfil mínimo. As recusas
+por e-mail inexistente, senha incorreta ou conta desativada usam o mesmo
+`401`. `GET /auth/session` consulta o perfil autenticado. `POST /auth/logout`
+revoga a sessão atual e responde `204` com a instrução para expirar o cookie,
+inclusive quando o pedido é repetido após perder a primeira resposta.
+As respostas de sessão usam `Cache-Control: no-store`.
+
+No Vue, `/entrar` abre a sessão e o roteador consulta a API antes de mostrar
+`/area-privada`. A área aberta revalida a sessão ao recuperar o foco e
+encaminha ao login ao receber `401`. Quando a saída fica sem confirmação,
+a tela oculta o perfil e permite repetir o logout. A US09 integrará a
+operação interna de desativação à gestão administrativa.
 
 ## 📅 7. Histórico
 
