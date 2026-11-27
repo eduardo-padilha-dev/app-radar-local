@@ -16,10 +16,11 @@ export function useLogin() {
     submitting.value = true;
     try {
       await login({ email: fields.email, password: fields.password });
-      fields.password = "";
       await router.replace({ name: "private-area" });
       if (router.currentRoute.value.name === "login") {
         error.value = loginError;
+      } else {
+        fields.password = "";
       }
     } catch {
       error.value = loginError;

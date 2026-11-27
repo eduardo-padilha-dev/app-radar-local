@@ -24,15 +24,17 @@ import {
   ApiExtraModels,
   ApiForbiddenResponse,
   ApiGoneResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import type { Request, Response } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
 import {
   AuthSessionGuard,
+  readSessionCookie,
   SESSION_COOKIE,
   type AuthenticatedRequest,
 } from './auth-session.guard.js';
@@ -85,21 +87,43 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionProfile> {
-    const allowedOrigin = new URL(
-      this.config.getOrThrow<string>('CORS_ORIGIN'),
-    );
-    if (req.headers.origin !== allowedOrigin.origin) {
-      throw new ForbiddenException();
-    }
+    const origin = this.requireSessionOrigin(req);
     const { profile, token, expiresAt } = await this.sessions.login(input);
     res.cookie(SESSION_COOKIE, token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: req.secure || allowedOrigin.protocol === 'https:',
-      path: '/',
-      expires: expiresAt,
+      ...this.sessionCookieOptions(req, origin),
+      // Cookie dates use whole seconds. Keep the cookie through the server deadline.
+      expires: new Date(Math.ceil(expiresAt.getTime() / 1000) * 1000),
     });
     return profile;
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Header('Cache-Control', 'no-store')
+  @ApiNoContentResponse({ description: 'Sessão do dispositivo encerrada.' })
+  @ApiForbiddenResponse({ description: 'Origem não autorizada.' })
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    const origin = this.requireSessionOrigin(req);
+    await this.sessions.logout(readSessionCookie(req));
+    res.clearCookie(SESSION_COOKIE, this.sessionCookieOptions(req, origin));
+  }
+
+  private requireSessionOrigin(req: Request): URL {
+    const origin = new URL(this.config.getOrThrow<string>('CORS_ORIGIN'));
+    if (req.headers.origin !== origin.origin) throw new ForbiddenException();
+    return origin;
+  }
+
+  private sessionCookieOptions(req: Request, origin: URL): CookieOptions {
+    return {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: req.secure || origin.protocol === 'https:',
+      path: '/',
+    };
   }
 
   @Get('session')

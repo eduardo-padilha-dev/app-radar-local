@@ -1,6 +1,8 @@
 import { scrypt as derive } from 'node:crypto';
 import { PasswordHasher } from './password-hasher.js';
 
+vi.mock(import('node:crypto'), { spy: true });
+
 it('stores distinct salts and the specified reproducible scrypt parameters for equal passwords', async () => {
   const hasher = new PasswordHasher();
   const first = await hasher.hash('same password');
@@ -46,6 +48,23 @@ describe('PasswordHasher.verify', () => {
   it('rejects a wrong password for a registration hash', async () => {
     await expect(hasher.verify('wrong password', registeredHash)).resolves.toBe(
       false,
+    );
+  });
+
+  it('rejects a missing hash after one derivation at the registration cost', async () => {
+    const scrypt = vi.mocked(derive);
+    await hasher.verify(registeredPassword, registeredHash);
+    const registeredDerivation = scrypt.mock.lastCall!;
+    scrypt.mockClear();
+
+    await expect(hasher.verify(registeredPassword, undefined)).resolves.toBe(
+      false,
+    );
+    expect(scrypt).toHaveBeenCalledExactlyOnceWith(
+      registeredPassword,
+      expect.any(Buffer),
+      ...registeredDerivation.slice(2, 4),
+      expect.any(Function),
     );
   });
 

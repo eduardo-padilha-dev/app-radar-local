@@ -70,6 +70,107 @@ it.each([
   }
 });
 
+it.each([
+  {
+    scenario: "unknown email",
+    email: "unknown@example.com",
+    password: "original password",
+  },
+  {
+    scenario: "wrong password",
+    email: "ana@example.com",
+    password: "wrong password",
+  },
+  {
+    scenario: "inactive account",
+    email: "inactive@example.com",
+    password: "original password",
+  },
+])("displays the same login message for $scenario", async ({ email, password }) => {
+  const apiError = {
+    statusCode: 401,
+    code: "HTTP_ERROR",
+    message: "Não foi possível concluir a solicitação.",
+  };
+  const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(JSON.stringify(apiError), { status: 401 }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  await router.push("/entrar");
+  const page = mount(App, { global: { plugins: [router] } });
+
+  try {
+    await page.get('input[type="email"]').setValue(email);
+    await page.get('input[type="password"]').setValue(password);
+    await page.get("form").trigger("submit");
+
+    await vi.waitFor(() => {
+      expect(page.get('[role="alert"]').text()).toBe("Não foi possível entrar na sua conta.");
+    });
+    expect(router.currentRoute.value.name).toBe("login");
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(/\/auth\/login$/),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      }),
+    );
+  } finally {
+    page.unmount();
+  }
+});
+
+it.each(["login", "session"])("allows login retry when the %s response is lost", async (failedRequest) => {
+  const profile = { id: "user-1", name: "Ana", role: "DEVELOPER" };
+  const email = "ana@example.com";
+  const password = "original password";
+  let failOnce = true;
+  const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+    if (failOnce && String(input).endsWith(`/auth/${failedRequest}`)) {
+      failOnce = false;
+      throw new TypeError("Network unavailable");
+    }
+    return new Response(JSON.stringify({ data: profile }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  await router.push("/entrar");
+  const page = mount(App, { global: { plugins: [router] } });
+  const removeErrorHandler = router.onError(() => {});
+
+  try {
+    const emailInput = page.get<HTMLInputElement>('input[type="email"]');
+    const passwordInput = page.get<HTMLInputElement>('input[type="password"]');
+    await emailInput.setValue(email);
+    await passwordInput.setValue(password);
+    await page.get("form").trigger("submit");
+
+    await vi.waitFor(() => {
+      expect(page.get('[role="alert"]').text()).toBe("Não foi possível entrar na sua conta.");
+      expect(page.get('button[type="submit"]').attributes("disabled")).toBeUndefined();
+    });
+    expect(router.currentRoute.value.name).toBe("login");
+    expect(emailInput.element.value).toBe(email);
+    expect(passwordInput.element.value).toBe(password);
+
+    await page.get("form").trigger("submit");
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.name).toBe("private-area");
+      expect(page.get("h1").text()).toBe("Área do desenvolvedor");
+    });
+
+    const loginRequests = fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/auth/login"));
+    expect(loginRequests).toHaveLength(2);
+    expect(loginRequests[1]?.[1]).toMatchObject({
+      method: "POST",
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
+    });
+  } finally {
+    removeErrorHandler();
+    page.unmount();
+  }
+});
+
 it("returns to the login page when private navigation has no session", async () => {
   const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
     new Response(null, { status: 401 }),
