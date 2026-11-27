@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: appdb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d appdb_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://app:app@localhost:5432/appdb_test?schema=public
+      TEST_DATABASE_URL: postgresql://app:app@localhost:5432/appdb_test?schema=public
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar o cliente Prisma
+        working-directory: apps/api
+        run: npx prisma generate
+
+      - name: Compilar API e frontend
+        run: npm run build
+
+      - name: Aplicar as migrations
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: Testes unitários da API
+        run: npm run test -w apps/api
+
+      - name: Testes de ponta a ponta da API
+        run: npm run test:e2e -w apps/api
+
+      - name: Testes do frontend
+        run: npm run test -w apps/web
+
+      - name: Lint
+        run: npm run lint
