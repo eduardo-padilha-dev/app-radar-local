@@ -24,8 +24,11 @@ import {
   ApiExtraModels,
   ApiForbiddenResponse,
   ApiGoneResponse,
+  ApiInternalServerErrorResponse,
+  ApiNotFoundResponse,
   ApiNoContentResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
   getSchemaPath,
@@ -65,6 +68,7 @@ const sessionProfileResponse = {
 };
 
 @ApiTags('auth')
+@ApiInternalServerErrorResponse({ description: 'Erro interno do servidor.' })
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -74,6 +78,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @ApiOperation({ summary: 'Inicia uma sessão' })
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @ApiBody({ type: LoginDto })
@@ -81,6 +86,7 @@ export class AuthController {
   @ApiOkResponse(sessionProfileResponse)
   @ApiBadRequestResponse({ description: 'Dados de entrada inválidos.' })
   @ApiUnauthorizedResponse({ description: 'Credenciais recusadas.' })
+  @ApiConflictResponse({ description: 'Conflito ao criar a sessão.' })
   @ApiForbiddenResponse({ description: 'Origem não autorizada.' })
   async login(
     @Body() input: LoginDto,
@@ -98,6 +104,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @ApiOperation({ summary: 'Encerra a sessão deste dispositivo' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Header('Cache-Control', 'no-store')
   @ApiNoContentResponse({ description: 'Sessão do dispositivo encerrada.' })
@@ -127,6 +134,7 @@ export class AuthController {
   }
 
   @Get('session')
+  @ApiOperation({ summary: 'Consulta a sessão atual' })
   @UseGuards(AuthSessionGuard)
   @ApiCookieAuth()
   @ApiExtraModels(SessionProfile)
@@ -137,6 +145,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @ApiOperation({ summary: 'Cria uma conta de desenvolvedor' })
   @ApiBody({ type: RegisterDto })
   @ApiCreatedResponse({
     schema: {
@@ -211,6 +220,7 @@ export class AuthController {
   }
 
   @Post('verify-email')
+  @ApiOperation({ summary: 'Confirma o e-mail da conta' })
   @UseFilters(
     new ApiExceptionFilter(({ token }) =>
       token ? invalidVerificationLink : undefined,
@@ -231,6 +241,7 @@ export class AuthController {
       },
     },
   })
+  @ApiNotFoundResponse({ description: 'Registro necessário não encontrado.' })
   @ApiGoneResponse({
     description: 'Link expirado.',
     schema: {
@@ -260,6 +271,7 @@ export class AuthController {
   }
 
   @Post('resend-verification')
+  @ApiOperation({ summary: 'Solicita outro e-mail de confirmação' })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiBody({ type: ResendVerificationDto })
   @ApiExtraModels(ResendVerificationResult)

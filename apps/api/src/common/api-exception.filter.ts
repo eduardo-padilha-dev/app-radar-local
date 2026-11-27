@@ -2,10 +2,13 @@ import {
   ArgumentsHost,
   Catch,
   HttpException,
+  HttpStatus,
+  Logger,
   type ExceptionFilter,
   type HttpExceptionOptions,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+import { Prisma } from '../../generated/prisma/client.js';
 
 type PublicApiError = {
   code: string;
@@ -25,13 +28,34 @@ export class PublicApiException extends HttpException {
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ApiExceptionFilter.name);
+
   constructor(
     private readonly mapValidationError?: (
       details: Record<string, string[]>,
     ) => PublicApiError | undefined,
   ) {}
   catch(exception: unknown, host: ArgumentsHost) {
-    const response = host.switchToHttp().getResponse<Response>();
+    const http = host.switchToHttp();
+    const response = http.getResponse<Response>();
+    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      if (exception.code === 'P2002') {
+        response.status(HttpStatus.CONFLICT).json({
+          statusCode: HttpStatus.CONFLICT,
+          code: 'UNIQUE_CONSTRAINT_VIOLATION',
+          message: 'Já existe um registro com este valor.',
+        });
+        return;
+      }
+      if (exception.code === 'P2025') {
+        response.status(HttpStatus.NOT_FOUND).json({
+          statusCode: HttpStatus.NOT_FOUND,
+          code: 'RECORD_NOT_FOUND',
+          message: 'Registro não encontrado.',
+        });
+        return;
+      }
+    }
     const statusCode =
       exception instanceof HttpException ? exception.getStatus() : 500;
     if (exception instanceof PublicApiException) {
@@ -83,6 +107,23 @@ export class ApiExceptionFilter implements ExceptionFilter {
         response.status(statusCode).json({ statusCode, ...validationError });
         return;
       }
+    }
+    if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      const request = http.getRequest<Request>();
+      const kind =
+        exception instanceof Prisma.PrismaClientKnownRequestError
+          ? exception.code
+          : exception instanceof Error
+            ? exception.constructor.name
+            : typeof exception;
+      const frames =
+        exception instanceof Error
+          ? exception.stack
+              ?.split('\n')
+              .filter((line) => /^\s+at /.test(line))
+              .join('\n')
+          : undefined;
+      this.logger.error(`${request.method} ${statusCode} (${kind})`, frames);
     }
     response.status(statusCode).json({
       statusCode,

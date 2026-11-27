@@ -1,8 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { AppModule } from './../src/app.module.js';
+import { AppService } from '../src/app.service.js';
+import { PrismaService } from '../src/database/prisma.service.js';
 import { configureApp } from '../src/common/configure-app.js';
 import { validateEnvironment } from '../src/config/environment.js';
 import { ResendEmailService } from '../src/integrations/resend/resend-email.service.js';
@@ -35,6 +38,60 @@ describe('AppController (e2e)', () => {
       .get('/')
       .expect(200)
       .expect({ data: 'Hello World!' });
+  });
+
+  it('returns safe responses for real PostgreSQL errors', async () => {
+    const prisma = app.get(PrismaService);
+    const id = randomUUID();
+    const service: { getHello(): unknown } = app.get(AppService);
+    const getHello = vi.spyOn(service, 'getHello');
+
+    getHello.mockImplementationOnce(() =>
+      prisma.$transaction(async (tx) => {
+        const data = {
+          name: 'Conta de teste',
+          email: id + '@example.com',
+          passwordHash: 'test-hash',
+        };
+        await tx.user.create({ data });
+        await tx.user.create({ data });
+      }),
+    );
+    await request(app.getHttpServer()).get('/').expect(409).expect({
+      statusCode: 409,
+      code: 'UNIQUE_CONSTRAINT_VIOLATION',
+      message: 'Já existe um registro com este valor.',
+    });
+
+    getHello.mockImplementationOnce(() => prisma.user.delete({ where: { id } }));
+    await request(app.getHttpServer()).get('/').expect(404).expect({
+      statusCode: 404,
+      code: 'RECORD_NOT_FOUND',
+      message: 'Registro não encontrado.',
+    });
+  });
+
+  it('documents every API operation with a summary and its responses', async () => {
+    const { body } = await request(app.getHttpServer())
+      .get('/docs-json')
+      .expect(200);
+    const operations = [
+      ['/', 'get', ['200', '500']],
+      ['/auth/login', 'post', ['200', '400', '401', '403', '409', '500']],
+      ['/auth/logout', 'post', ['204', '403', '500']],
+      ['/auth/session', 'get', ['200', '401', '500']],
+      ['/auth/register', 'post', ['201', '400', '409', '500', '502']],
+      ['/auth/verify-email', 'post', ['200', '400', '404', '410', '500']],
+      ['/auth/resend-verification', 'post', ['202', '400', '500']],
+    ] as const;
+    for (const [path, method, statuses] of operations) {
+      const operation = body.paths[path][method];
+      expect(operation.summary).toBeTruthy();
+      expect(operation.tags).toHaveLength(1);
+      expect(Object.keys(operation.responses)).toEqual(
+        expect.arrayContaining(statuses),
+      );
+    }
   });
 
   it('serves the live OpenAPI contract for the public registration endpoint', async () => {

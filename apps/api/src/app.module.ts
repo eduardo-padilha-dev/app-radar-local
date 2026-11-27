@@ -1,5 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, ValidationPipe } from '@nestjs/common';
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ApiExceptionFilter } from './common/api-exception.filter.js';
+import { DataInterceptor } from './common/data.interceptor.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './modules/auth/auth.module.js';
@@ -13,6 +16,20 @@ import { validateEnvironment } from './config/environment.js';
     ResendModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_PIPE,
+      useValue: new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        errorFormat: 'grouped',
+        transformOptions: { enableImplicitConversion: false },
+      }),
+    },
+    { provide: APP_INTERCEPTOR, useClass: DataInterceptor },
+    { provide: APP_FILTER, useFactory: () => new ApiExceptionFilter() },
+  ],
 })
 export class AppModule {}

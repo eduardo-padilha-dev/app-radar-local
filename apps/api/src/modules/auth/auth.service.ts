@@ -4,6 +4,7 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -86,6 +87,7 @@ export class AuthService {
           if (adapterError?.cause?.constraint?.index === 'users_email_key') {
             throw new ConflictException({ code: 'EMAIL_ALREADY_REGISTERED' });
           }
+          throw new InternalServerErrorException(undefined, { cause: error });
         }
         throw error;
       });
