@@ -7,7 +7,6 @@ import {
   NotFoundException,
   Param,
   Req,
-  UseGuards,
   type INestApplication,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -23,7 +22,6 @@ import { ResendEmailService } from '../src/integrations/resend/resend-email.serv
 import type { Prisma } from '../generated/prisma/client.js';
 import { Role } from '../generated/prisma/enums.js';
 import {
-  AuthSessionGuard,
   RequireRole,
   type AuthenticatedRequest,
 } from '../src/modules/auth/auth-session.guard.js';
@@ -45,7 +43,6 @@ vi.hoisted(() => {
 const prospectingResults = new Map<string, { userId: string; name: string }>();
 
 @Controller('test/private')
-@UseGuards(AuthSessionGuard)
 class PrivateResourcesController {
   constructor(
     @Inject(SearchEmailEligibilityService)
@@ -84,6 +81,16 @@ class PrivateResourcesController {
   }
 }
 
+const defaultProtectedHandler = vi.fn(() => ({ area: 'default-protected' }));
+
+@Controller('test/default-protected')
+class DefaultProtectedController {
+  @Get()
+  get() {
+    return defaultProtectedHandler();
+  }
+}
+
 const origin = 'https://web.example';
 const password = 'original password';
 const developerEmail = 'session-dev@example.com';
@@ -107,7 +114,7 @@ describe('account sessions (e2e)', () => {
     requireTestDatabaseUrl(process.env.DATABASE_URL);
     const module = await Test.createTestingModule({
       imports: [AppModule, AuthModule],
-      controllers: [PrivateResourcesController],
+      controllers: [PrivateResourcesController, DefaultProtectedController],
     })
       .overrideProvider(ResendEmailService)
       .useValue({ sendVerificationEmail: vi.fn() })
@@ -253,6 +260,44 @@ describe('account sessions (e2e)', () => {
       .set('Cookie', cookie);
   }
 
+  function defaultProtectedResource(cookie?: string) {
+    const resource = request(app.getHttpServer()).get('/test/default-protected');
+    if (cookie) resource.set('Cookie', cookie);
+    return resource;
+  }
+
+  async function expectDefaultProtectedDenial(cookie?: string) {
+    defaultProtectedHandler.mockClear();
+    await defaultProtectedResource(cookie).expect(401);
+    expect(defaultProtectedHandler).not.toHaveBeenCalled();
+  }
+
+  it('requires a session by default without reaching the handler', async () => {
+    await expectDefaultProtectedDenial();
+  });
+
+  it('refuses a fixture cookie with an altered signature by default', async () => {
+    const cookie = sessionCookie(await login(developerEmail).expect(200));
+    const [header, payload] = cookie.split('.');
+    await expectDefaultProtectedDenial([header, payload, 'invalid'].join('.'));
+  });
+
+  it('allows a valid session and refuses the same cookie after logout by default', async () => {
+    const cookie = sessionCookie(await login(developerEmail).expect(200));
+    defaultProtectedHandler.mockClear();
+    await defaultProtectedResource(cookie)
+      .expect(200)
+      .expect({ data: { area: 'default-protected' } });
+    expect(defaultProtectedHandler).toHaveBeenCalledOnce();
+
+    await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .expect(204);
+    await expectDefaultProtectedDenial(cookie);
+  });
+
   it('keeps a fixed eight-hour session and refuses the old cookie at the exact deadline', async () => {
     const signedInAt = new Date('2026-11-26T13:00:00.437Z').getTime();
     const expiresAt = signedInAt + 8 * 60 * 60 * 1000;
@@ -294,6 +339,17 @@ describe('account sessions (e2e)', () => {
         .get('/auth/session')
         .set('Cookie', cookie)
         .expect(401);
+
+      await expectDefaultProtectedDenial(cookie);
+
+      const logout = await request(app.getHttpServer())
+        .post('/auth/logout')
+        .set('Origin', origin)
+        .set('Cookie', cookie)
+        .expect(204)
+        .expect('Cache-Control', 'no-store')
+        .expect('');
+      expectClearedSessionCookie(logout);
     } finally {
       vi.useRealTimers();
     }
@@ -314,15 +370,7 @@ describe('account sessions (e2e)', () => {
       .expect(204)
       .expect('Cache-Control', 'no-store')
       .expect('');
-    const [cookie, ...attributes] = sessionCookieHeader(logout).split('; ');
-    expect(cookie).toBe('radar_session=');
-    expect(attributes.sort()).toEqual([
-      'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-      'HttpOnly',
-      'Path=/',
-      'SameSite=Lax',
-      'Secure',
-    ]);
+    expectClearedSessionCookie(logout);
 
     await privateResource('developer', firstCookie).expect(401);
     await privateResource('developer', secondCookie).expect(200);
@@ -347,14 +395,7 @@ describe('account sessions (e2e)', () => {
       .expect(204)
       .expect('Cache-Control', 'no-store')
       .expect('');
-    expect(sessionCookieHeader(retry).split('; ').sort()).toEqual([
-      'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-      'HttpOnly',
-      'Path=/',
-      'SameSite=Lax',
-      'Secure',
-      'radar_session=',
-    ]);
+    expectClearedSessionCookie(retry);
     await privateResource('developer', cookie).expect(401);
   });
 
@@ -540,6 +581,14 @@ describe('account sessions (e2e)', () => {
     await privateResource('developer', cookie).expect(200);
   });
 
+  it('rejects logout requests from other origins even without a cookie', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Origin', 'https://other.example')
+      .expect(403);
+    expect(response.headers['set-cookie']).toBeUndefined();
+  });
+
   it.each([undefined, 'radar_session=invalid'])(
     'expires the cookie even when there is no usable session (%s)',
     async (cookie) => {
@@ -548,8 +597,11 @@ describe('account sessions (e2e)', () => {
         .set('Origin', origin);
       if (cookie) logout.set('Cookie', cookie);
 
-      const response = await logout.expect(204).expect('');
-      expect(sessionCookie(response)).toBe('radar_session=');
+      const response = await logout
+        .expect(204)
+        .expect('Cache-Control', 'no-store')
+        .expect('');
+      expectClearedSessionCookie(response);
     },
   );
 
@@ -683,4 +735,16 @@ function sessionCookieHeader(response: Response) {
     throw new Error('Expected one session cookie');
   }
   return cookies[0];
+}
+
+function expectClearedSessionCookie(response: Response) {
+  const [cookie, ...attributes] = sessionCookieHeader(response).split('; ');
+  expect(cookie).toBe('radar_session=');
+  expect(attributes.sort()).toEqual([
+    'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+    'HttpOnly',
+    'Path=/',
+    'SameSite=Lax',
+    'Secure',
+  ]);
 }

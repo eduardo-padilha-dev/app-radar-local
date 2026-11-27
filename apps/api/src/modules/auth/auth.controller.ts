@@ -11,7 +11,6 @@ import {
   Req,
   Res,
   UseFilters,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
@@ -36,7 +35,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { CookieOptions, Request, Response } from 'express';
 import {
-  AuthSessionGuard,
+  PublicRoute,
   readSessionCookie,
   SESSION_COOKIE,
   type AuthenticatedRequest,
@@ -78,6 +77,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @PublicRoute()
   @ApiOperation({ summary: 'Inicia uma sessão' })
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
@@ -104,6 +104,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @PublicRoute()
   @ApiOperation({ summary: 'Encerra a sessão deste dispositivo' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Header('Cache-Control', 'no-store')
@@ -135,7 +136,6 @@ export class AuthController {
 
   @Get('session')
   @ApiOperation({ summary: 'Consulta a sessão atual' })
-  @UseGuards(AuthSessionGuard)
   @ApiCookieAuth()
   @ApiExtraModels(SessionProfile)
   @ApiOkResponse(sessionProfileResponse)
@@ -145,6 +145,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @PublicRoute()
   @ApiOperation({ summary: 'Cria uma conta de desenvolvedor' })
   @ApiBody({ type: RegisterDto })
   @ApiCreatedResponse({
@@ -220,6 +221,7 @@ export class AuthController {
   }
 
   @Post('verify-email')
+  @PublicRoute()
   @ApiOperation({ summary: 'Confirma o e-mail da conta' })
   @UseFilters(
     new ApiExceptionFilter(({ token }) =>
@@ -271,6 +273,7 @@ export class AuthController {
   }
 
   @Post('resend-verification')
+  @PublicRoute()
   @ApiOperation({ summary: 'Solicita outro e-mail de confirmação' })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiBody({ type: ResendVerificationDto })

@@ -6,6 +6,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { AppService } from './app.service.js';
+import { PublicRoute } from './modules/auth/auth-session.guard.js';
 
 @ApiTags('sistema')
 @ApiInternalServerErrorResponse({ description: 'Erro interno do servidor.' })
@@ -14,6 +15,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
+  @PublicRoute()
   @ApiOperation({ summary: 'Verifica se a API responde' })
   @ApiOkResponse({
     description: 'API disponível.',

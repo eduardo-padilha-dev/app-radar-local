@@ -12,7 +12,7 @@ Complemento para revisão. [Spec de autorização](complemento-autorizacao.md).
 
 ## Tarefas
 
-- [ ] **Tarefa 1 — Proteger rotas por padrão**
+- [x] **Tarefa 1 — Proteger rotas por padrão**
   - Cobre CA8 e CA9. Os dois critérios entram juntos para que o login continue acessível ao ativar o guard global.
   - Teste primeiro. Montar um controller de teste com uma rota sem guard local e verificar 401 sem sessão, com cookie adulterado, expirado ou revogado. Usar um espião no handler para comprovar que o guard interrompe a chamada. Com cookie válido, esperar 200. A rota de teste hoje aceita uma chamada sem autenticação, então o primeiro cenário deve falhar antes do registro global. Reexecutar as verificações de cadastro, login, confirmação e reenvio sem cookie e cobrir explicitamente o logout com cookie ausente, inválido ou expirado e a recusa de origem indevida. Verificar também `GET /`, `/docs/` e `/docs-json`.
   - Arquivos previstos: `apps/api/src/app.module.ts`, `apps/api/src/app.controller.ts`, `apps/api/src/modules/auth/auth-session.guard.ts`, `apps/api/src/modules/auth/auth.controller.ts`, `apps/api/test/auth-session.e2e-spec.ts` e, se necessário, `apps/api/test/app.e2e-spec.ts`.
