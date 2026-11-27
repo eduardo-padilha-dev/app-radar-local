@@ -41,7 +41,7 @@
   - Teste primeiro — duas sessões da mesma conta acessam a área privada. Sair pela primeira expira seu cookie, invalida seu JWT reapresentado e mantém a segunda sessão válida. A tela volta à entrada e exige login ao tentar reabrir a área privada. Hoje não há encerramento por sessão.
   - Arquivos previstos — controlador, serviço de sessão e configuração HTTP da API, `apps/api/test/auth-session.e2e-spec.ts`, cliente e área privada com teste em `apps/web/src/features/auth/`.
 
-- [ ] **Tarefa 7 — Revogar sessões da conta desativada**
+- [x] **Tarefa 7 — Revogar sessões da conta desativada**
   - Cobre CA6.
   - Teste primeiro — ao desativar uma conta com duas sessões, ambas perdem acesso. Depois da reativação, ambas continuam inválidas e um novo login funciona. Um teste de concorrência confirma que um login iniciado antes da desativação não deixa sessão válida após a transação. O cenário falha enquanto a transição de estado não revogar as sessões.
   - Arquivos previstos — operação interna de desativação, serviço de sessão e `apps/api/test/auth-session.e2e-spec.ts`.

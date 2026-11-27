@@ -20,12 +20,14 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/common/configure-app.js';
 import { PrismaService } from '../src/database/prisma.service.js';
 import { ResendEmailService } from '../src/integrations/resend/resend-email.service.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import { Role } from '../generated/prisma/enums.js';
 import {
   AuthSessionGuard,
   RequireRole,
   type AuthenticatedRequest,
 } from '../src/modules/auth/auth-session.guard.js';
+import { AuthSessionService } from '../src/modules/auth/auth-session.service.js';
 import { AuthModule } from '../src/modules/auth/auth.module.js';
 import { PasswordHasher } from '../src/modules/auth/password-hasher.js';
 import { SearchEmailEligibilityService } from '../src/modules/auth/search-email-eligibility.service.js';
@@ -326,6 +328,176 @@ describe('account sessions (e2e)', () => {
     await privateResource('developer', secondCookie).expect(200);
   });
 
+  it('revokes both device sessions permanently when the account is deactivated', async () => {
+    const { id } = await prisma.user.findUniqueOrThrow({
+      where: { email: developerEmail },
+      select: { id: true },
+    });
+    const firstCookie = sessionCookie(await login(developerEmail).expect(200));
+    const secondCookie = sessionCookie(await login(developerEmail).expect(200));
+    const otherAccountCookie = sessionCookie(
+      await login(otherDeveloperEmail).expect(200),
+    );
+
+    expect(firstCookie).not.toBe(secondCookie);
+    await privateResource('developer', firstCookie).expect(200);
+    await privateResource('developer', secondCookie).expect(200);
+
+    try {
+      await app.get(AuthSessionService).deactivateAccount(id);
+      await privateResource('developer', firstCookie).expect(401);
+      await privateResource('developer', secondCookie).expect(401);
+      await privateResource('developer', otherAccountCookie).expect(200);
+    } finally {
+      await prisma.user.update({ where: { id }, data: { isActive: true } });
+    }
+
+    await privateResource('developer', firstCookie).expect(401);
+    await privateResource('developer', secondCookie).expect(401);
+    const newCookie = sessionCookie(await login(developerEmail).expect(200));
+    await privateResource('developer', newCookie).expect(200);
+  });
+
+  it('refuses an in-flight login when deactivation commits before session creation', async () => {
+    const { id } = await prisma.user.findUniqueOrThrow({
+      where: { email: developerEmail },
+      select: { id: true },
+    });
+    const where = { userId: id };
+    const sessionCount = await prisma.authSession.count({ where });
+    const passwordVerified = deferred<boolean>();
+    const resumeLogin = deferred<void>();
+    const passwordHasher = app.get(PasswordHasher);
+    const verifyPassword = passwordHasher.verify.bind(passwordHasher);
+    const pauseAfterVerification = vi
+      .spyOn(passwordHasher, 'verify')
+      .mockImplementationOnce(async (password, hash) => {
+        const matches = await verifyPassword(password, hash);
+        passwordVerified.resolve(matches);
+        await resumeLogin.promise;
+        return matches;
+      });
+    const pendingLogin = login(developerEmail).then();
+
+    try {
+      const passwordMatches = await Promise.race([
+        passwordVerified.promise,
+        pendingLogin.then(() => {
+          throw new Error(
+            'Login completed before password verification paused',
+          );
+        }),
+      ]);
+      expect(passwordMatches).toBe(true);
+
+      await app.get(AuthSessionService).deactivateAccount(id);
+      resumeLogin.resolve();
+      const response = await pendingLogin;
+
+      expect(response.status).toBe(401);
+      expect(response.headers['set-cookie']).toBeUndefined();
+      expect(await prisma.authSession.count({ where })).toBe(sessionCount);
+    } finally {
+      resumeLogin.resolve();
+      pauseAfterVerification.mockRestore();
+      try {
+        await pendingLogin;
+      } finally {
+        await prisma.user.update({ where: { id }, data: { isActive: true } });
+      }
+    }
+  });
+
+  it('revokes the session from a login that holds the account lock during deactivation', async () => {
+    const { id } = await prisma.user.findUniqueOrThrow({
+      where: { email: developerEmail },
+      select: { id: true },
+    });
+    const sessionCreationReached = deferred<void>();
+    const resumeLogin = deferred<void>();
+    const loginBackendPid = deferred<number>();
+    const deactivationBackendPid = deferred<number>();
+    const prismaWithPausedSessionCreation = prisma.$extends({
+      query: {
+        authSession: {
+          async create({ args, query }) {
+            sessionCreationReached.resolve();
+            await resumeLogin.promise;
+            return query(args);
+          },
+        },
+      },
+    });
+    // Capture both methods before installing the spy inherited by the extended client.
+    const runLoginTransaction =
+      prismaWithPausedSessionCreation.$transaction.bind(
+        prismaWithPausedSessionCreation,
+      );
+    const runDeactivationTransaction = prisma.$transaction.bind(prisma);
+    const observeTransactions = vi
+      .spyOn(prisma, '$transaction')
+      .mockImplementationOnce((operation, options) =>
+        runLoginTransaction(async (tx) => {
+          // The query extension preserves the transaction client's operations.
+          const transaction = tx as unknown as Prisma.TransactionClient;
+          loginBackendPid.resolve(await backendPid(transaction));
+          return operation(transaction);
+        }, options),
+      )
+      .mockImplementationOnce((operation, options) =>
+        runDeactivationTransaction(async (tx) => {
+          deactivationBackendPid.resolve(await backendPid(tx));
+          return operation(tx);
+        }, options),
+      );
+    const pendingLogin = login(developerEmail).expect(200).then();
+    let pendingDeactivation: Promise<void> | undefined;
+
+    try {
+      const [loginPid] = await Promise.race([
+        Promise.all([loginBackendPid.promise, sessionCreationReached.promise]),
+        pendingLogin.then(() => {
+          throw new Error('Login completed before session creation paused');
+        }),
+      ]);
+
+      let deactivationFinished = false;
+      pendingDeactivation = app
+        .get(AuthSessionService)
+        .deactivateAccount(id)
+        .finally(() => {
+          deactivationFinished = true;
+        });
+      const deactivationWasBlocked = await Promise.race([
+        vi.waitFor(async () => {
+          if (deactivationFinished) return false;
+          const deactivationPid = await deactivationBackendPid.promise;
+          const [{ blocked }] = await prisma.$queryRaw<[{ blocked: boolean }]>`
+            SELECT ${loginPid}::int = ANY(pg_blocking_pids(${deactivationPid}::int))
+              AS blocked
+          `;
+          expect(blocked).toBe(true);
+          return true;
+        }),
+        pendingDeactivation.then(() => false),
+      ]);
+
+      resumeLogin.resolve();
+      const [response] = await Promise.all([pendingLogin, pendingDeactivation]);
+      const cookie = sessionCookie(response);
+      await privateResource('developer', cookie).expect(401);
+
+      await prisma.user.update({ where: { id }, data: { isActive: true } });
+      await privateResource('developer', cookie).expect(401);
+      expect(deactivationWasBlocked).toBe(true);
+    } finally {
+      resumeLogin.resolve();
+      observeTransactions.mockRestore();
+      await Promise.allSettled([pendingLogin, pendingDeactivation]);
+      await prisma.user.update({ where: { id }, data: { isActive: true } });
+    }
+  });
+
   it('rejects logout requests from other origins without changing the session', async () => {
     const cookie = sessionCookie(await login(developerEmail).expect(200));
     const logout = await request(app.getHttpServer())
@@ -451,6 +623,21 @@ describe('account sessions (e2e)', () => {
     await request(app.getHttpServer()).get('/auth/session').expect(401);
   });
 });
+
+async function backendPid(tx: Prisma.TransactionClient) {
+  const [{ pid }] = await tx.$queryRaw<[{ pid: number }]>`
+    SELECT pg_backend_pid() AS pid
+  `;
+  return pid;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((finish) => {
+    resolve = finish;
+  });
+  return { promise, resolve };
+}
 
 function sessionCookie(response: Response) {
   return sessionCookieHeader(response).split(';', 1)[0];

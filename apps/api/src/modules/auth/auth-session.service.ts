@@ -44,10 +44,37 @@ export class AuthSessionService {
       sid: sessionId,
       exp: expiresAt.getTime() / 1000,
     });
-    await this.prisma.authSession.create({
-      data: { id: sessionId, userId: id, expiresAt },
-    });
+    await this.prisma.$transaction(
+      async (tx) => {
+        // Hold the same user row that deactivation updates until the session is stored.
+        const activeUsers = await tx.$queryRaw<{ id: string }[]>`
+          SELECT id FROM users WHERE id = ${id}::uuid AND "isActive" FOR UPDATE
+        `;
+        if (activeUsers.length === 0) throw new UnauthorizedException();
+
+        await tx.authSession.create({
+          data: { id: sessionId, userId: id, expiresAt },
+        });
+      },
+      { isolationLevel: 'ReadCommitted' },
+    );
     return { profile: { id, name, role }, token, expiresAt };
+  }
+
+  async deactivateAccount(userId: string): Promise<void> {
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.user.update({
+          where: { id: userId },
+          data: { isActive: false },
+        });
+        await tx.authSession.updateMany({
+          where: { userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      },
+      { isolationLevel: 'ReadCommitted' },
+    );
   }
 
   async authenticate(token: string): Promise<SessionProfile> {
