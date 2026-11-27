@@ -297,6 +297,60 @@ describe('account sessions (e2e)', () => {
     }
   });
 
+  it('signs out only the current device and expires its session cookie', async () => {
+    const firstCookie = sessionCookie(await login(developerEmail).expect(200));
+    const secondCookie = sessionCookie(await login(developerEmail).expect(200));
+    expect(firstCookie).not.toBe(secondCookie);
+
+    await privateResource('developer', firstCookie).expect(200);
+    await privateResource('developer', secondCookie).expect(200);
+
+    const logout = await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Origin', origin)
+      .set('Cookie', firstCookie)
+      .expect(204)
+      .expect('Cache-Control', 'no-store')
+      .expect('');
+    const [cookie, ...attributes] = sessionCookieHeader(logout).split('; ');
+    expect(cookie).toBe('radar_session=');
+    expect(attributes.sort()).toEqual([
+      'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+      'HttpOnly',
+      'Path=/',
+      'SameSite=Lax',
+      'Secure',
+    ]);
+
+    await privateResource('developer', firstCookie).expect(401);
+    await privateResource('developer', secondCookie).expect(200);
+  });
+
+  it('rejects logout requests from other origins without changing the session', async () => {
+    const cookie = sessionCookie(await login(developerEmail).expect(200));
+    const logout = await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Origin', 'https://other.example')
+      .set('Cookie', cookie)
+      .expect(403);
+    expect(logout.headers['set-cookie']).toBeUndefined();
+
+    await privateResource('developer', cookie).expect(200);
+  });
+
+  it.each([undefined, 'radar_session=invalid'])(
+    'expires the cookie even when there is no usable session (%s)',
+    async (cookie) => {
+      const logout = request(app.getHttpServer())
+        .post('/auth/logout')
+        .set('Origin', origin);
+      if (cookie) logout.set('Cookie', cookie);
+
+      const response = await logout.expect(204).expect('');
+      expect(sessionCookie(response)).toBe('radar_session=');
+    },
+  );
+
   it.each([
     { email: developerEmail, allowed: 'developer', denied: 'admin' },
     { email: adminEmail, allowed: 'admin', denied: 'developer' },

@@ -13,6 +13,162 @@ function validSession(sessionProfile = profile) {
   return new Response(JSON.stringify({ data: sessionProfile }), { status: 200 });
 }
 
+it("ends the current session and requires a new login to reopen the private area", async () => {
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(validSession())
+    .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    .mockResolvedValueOnce(new Response(null, { status: 401 }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  await router.push("/entrar");
+  await router.push("/area-privada");
+  const page = mount(App, { global: { plugins: [router] } });
+  try {
+    expect(page.get("h1").text()).toBe("Área do desenvolvedor");
+    const logout = page.get("button");
+    expect(logout.text()).toBe("Sair");
+    await logout.trigger("click");
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringMatching(/\/auth\/logout$/),
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
+    expect(router.currentRoute.value.path).toBe("/entrar");
+    expect(page.get("h1").text()).toBe("Entre no Radar Local");
+
+    await router.push("/area-privada");
+    expect(router.currentRoute.value.path).toBe("/entrar");
+    expect(page.get("h1").text()).toBe("Entre no Radar Local");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  } finally {
+    page.unmount();
+  }
+});
+
+it("requires a new login when the private area is reopened during logout", async () => {
+  let completeLogout!: () => void;
+  const logoutResponse = new Promise<void>((resolve) => {
+    completeLogout = resolve;
+  });
+  let sessionActive = true;
+  const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+    if (String(input).endsWith("/auth/logout")) {
+      await logoutResponse;
+      sessionActive = false;
+      return new Response(null, { status: 204 });
+    }
+
+    return sessionActive ? validSession() : new Response(null, { status: 401 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await router.push("/entrar");
+  await router.push("/area-privada");
+  const page = mount(App, { global: { plugins: [router] } });
+  try {
+    const logoutButton = page.get("button");
+    await logoutButton.trigger("click");
+    expect(logoutButton.attributes("disabled")).toBeDefined();
+    await logoutButton.trigger("click");
+
+    await router.push("/entrar");
+    const reopening = router.push("/area-privada");
+    await flushPromises();
+    const profileVisibleWhileLoggingOut = page.text().includes("Olá, Ana.");
+
+    completeLogout();
+    await reopening;
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe("login");
+    expect(page.get("h1").text()).toBe("Entre no Radar Local");
+    expect(profileVisibleWhileLoggingOut).toBe(false);
+    const logoutRequests = fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/auth/logout"));
+    expect(logoutRequests).toHaveLength(1);
+  } finally {
+    page.unmount();
+    completeLogout();
+    await flushPromises();
+  }
+});
+
+it("preserves a new login submitted while the previous logout is pending", async () => {
+  let completeLogout!: () => void;
+  const logoutResponse = new Promise<void>((resolve) => {
+    completeLogout = resolve;
+  });
+  const nextProfile = { ...profile, id: "user-2", name: "Marina" };
+  let currentProfile: typeof profile | undefined = profile;
+  const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+    if (String(input).endsWith("/auth/logout")) {
+      await logoutResponse;
+      currentProfile = undefined;
+      return new Response(null, { status: 204 });
+    }
+
+    if (String(input).endsWith("/auth/login")) {
+      currentProfile = nextProfile;
+    }
+
+    return currentProfile ? validSession(currentProfile) : new Response(null, { status: 401 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await router.push("/entrar");
+  await router.push("/area-privada");
+  const page = mount(App, { global: { plugins: [router] } });
+  try {
+    await page.get("button").trigger("click");
+    await router.push("/entrar");
+
+    await page.get('input[type="email"]').setValue("marina@example.com");
+    await page.get('input[type="password"]').setValue("original password");
+    await page.get("form").trigger("submit");
+    await flushPromises();
+    const requestCountBeforeLogout = fetchMock.mock.calls.length;
+
+    completeLogout();
+    await flushPromises();
+
+    expect(requestCountBeforeLogout).toBe(2);
+    expect(router.currentRoute.value.name).toBe("private-area");
+    expect(page.text()).toContain("Olá, Marina.");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  } finally {
+    page.unmount();
+    completeLogout();
+    await flushPromises();
+  }
+});
+
+it("keeps private content hidden if navigation after logout is blocked", async () => {
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(validSession())
+    .mockResolvedValueOnce(new Response(null, { status: 204 }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  await router.push("/entrar");
+  await router.push("/area-privada");
+  const page = mount(App, { global: { plugins: [router] } });
+  const restoreLogin = router.beforeEach((to) => to.name !== "login");
+  try {
+    await page.get("button").trigger("click");
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe("private-area");
+    expect(page.text()).not.toContain("Olá, Ana.");
+    expect(page.get('a[href="/entrar"]').text()).toBe("Entrar");
+    window.dispatchEvent(new Event("focus"));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  } finally {
+    restoreLogin();
+    page.unmount();
+  }
+});
+
 it("requires a new login when an open private area is revisited after the session expires", async () => {
   const fetchMock = vi
     .fn<typeof fetch>()

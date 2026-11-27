@@ -36,7 +36,7 @@
   - Teste primeiro — com relógio controlado, verificar os atributos do cookie e aceitar a sessão antes de oito horas. Atividade intermediária mantém a expiração original. No limite, o acesso privado com o cookie anterior retorna `401` e o Vue solicita novo login. O cenário falha enquanto faltar a política completa de expiração no fluxo.
   - Arquivos previstos — configuração de cookie e serviço de sessão da API, `apps/api/test/auth-session.e2e-spec.ts`, roteador, área privada e respectivos testes web.
 
-- [ ] **Tarefa 6 — Sair do dispositivo atual**
+- [x] **Tarefa 6 — Sair do dispositivo atual**
   - Cobre CA5.
   - Teste primeiro — duas sessões da mesma conta acessam a área privada. Sair pela primeira expira seu cookie, invalida seu JWT reapresentado e mantém a segunda sessão válida. A tela volta à entrada e exige login ao tentar reabrir a área privada. Hoje não há encerramento por sessão.
   - Arquivos previstos — controlador, serviço de sessão e configuração HTTP da API, `apps/api/test/auth-session.e2e-spec.ts`, cliente e área privada com teste em `apps/web/src/features/auth/`.

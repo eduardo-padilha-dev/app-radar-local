@@ -1,16 +1,18 @@
 import { onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { HttpError } from "../../shared/http/client";
-import { getSession, type SessionProfile } from "./session.service";
+import { getSession, logout, type SessionProfile } from "./session.service";
 
 type SessionState =
   | { status: "verified"; profile: SessionProfile }
   | { status: "checking" }
-  | { status: "failed" };
+  | { status: "failed" }
+  | { status: "signed-out" };
 
 export function usePrivateSession(initialProfile: SessionProfile) {
   const router = useRouter();
   const state = ref<SessionState>({ status: "verified", profile: initialProfile });
+  const logoutStatus = ref<"idle" | "pending" | "failed">("idle");
   let isMounted = false;
 
   function isPrivateAreaActive() {
@@ -18,7 +20,13 @@ export function usePrivateSession(initialProfile: SessionProfile) {
   }
 
   async function revalidateSession() {
-    if (state.value.status === "checking") return;
+    if (
+      state.value.status === "checking" ||
+      state.value.status === "signed-out" ||
+      logoutStatus.value === "pending"
+    ) {
+      return;
+    }
     state.value = { status: "checking" };
 
     try {
@@ -34,6 +42,24 @@ export function usePrivateSession(initialProfile: SessionProfile) {
     }
   }
 
+  async function endSession() {
+    if (state.value.status !== "verified" || logoutStatus.value === "pending") return;
+    logoutStatus.value = "pending";
+
+    try {
+      await logout();
+    } catch {
+      logoutStatus.value = "failed";
+      return;
+    }
+
+    state.value = { status: "signed-out" };
+    logoutStatus.value = "idle";
+    if (isPrivateAreaActive()) {
+      await router.replace({ name: "login" }).catch(() => undefined);
+    }
+  }
+
   onMounted(() => {
     isMounted = true;
     window.addEventListener("focus", revalidateSession);
@@ -44,5 +70,5 @@ export function usePrivateSession(initialProfile: SessionProfile) {
     window.removeEventListener("focus", revalidateSession);
   });
 
-  return { state, revalidateSession };
+  return { state, revalidateSession, logoutStatus, endSession };
 }

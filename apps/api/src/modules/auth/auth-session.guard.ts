@@ -15,6 +15,15 @@ import type { SessionProfile } from './dto/session-profile.dto.js';
 export const SESSION_COOKIE = 'radar_session';
 export const RequireRole = Reflector.createDecorator<Role>();
 
+export function readSessionCookie(req: Request): string | undefined {
+  const prefix = SESSION_COOKIE + '=';
+  return req.headers.cookie
+    ?.split(';')
+    .map((pair) => pair.trim())
+    .find((pair) => pair.startsWith(prefix))
+    ?.slice(prefix.length);
+}
+
 export interface AuthenticatedRequest extends Request {
   authenticatedUser: SessionProfile;
 }
@@ -31,16 +40,10 @@ export class AuthSessionGuard implements CanActivate {
     const req = http.getRequest<AuthenticatedRequest>();
     http.getResponse<Response>().setHeader('Cache-Control', 'no-store');
 
-    const prefix = SESSION_COOKIE + '=';
-    const cookie = req.headers.cookie
-      ?.split(';')
-      .map((pair) => pair.trim())
-      .find((pair) => pair.startsWith(prefix));
-    if (!cookie) throw new UnauthorizedException();
+    const token = readSessionCookie(req);
+    if (!token) throw new UnauthorizedException();
 
-    const profile = await this.sessions.authenticate(
-      cookie.slice(prefix.length),
-    );
+    const profile = await this.sessions.authenticate(token);
     const requiredRole = this.reflector.getAllAndOverride(RequireRole, [
       context.getHandler(),
       context.getClass(),

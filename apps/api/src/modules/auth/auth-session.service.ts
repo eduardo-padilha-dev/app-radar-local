@@ -51,15 +51,10 @@ export class AuthSessionService {
   }
 
   async authenticate(token: string): Promise<SessionProfile> {
-    const { sub, sid } = await this.jwt
-      .verifyAsync<SessionClaims>(token, { clockTimestamp: Date.now() / 1000 })
-      .catch(() => {
-        throw new UnauthorizedException();
-      });
-    if (!isUUID(sub) || !isUUID(sid, '4')) {
-      throw new UnauthorizedException();
-    }
+    const claims = await this.verifySessionClaims(token);
+    if (!claims) throw new UnauthorizedException();
 
+    const { sub, sid } = claims;
     const session = await this.prisma.authSession.findFirst({
       where: {
         id: sid,
@@ -73,5 +68,35 @@ export class AuthSessionService {
     if (!session) throw new UnauthorizedException();
 
     return session.user;
+  }
+
+  async logout(token: string | undefined): Promise<void> {
+    if (!token) return;
+
+    const claims = await this.verifySessionClaims(token);
+    if (!claims) return;
+
+    const { sub, sid } = claims;
+    const revokedAt = new Date();
+    await this.prisma.authSession.updateMany({
+      where: {
+        id: sid,
+        userId: sub,
+        revokedAt: null,
+        expiresAt: { gt: revokedAt },
+      },
+      data: { revokedAt },
+    });
+  }
+
+  private async verifySessionClaims(
+    token: string,
+  ): Promise<SessionClaims | undefined> {
+    const claims = await this.jwt
+      .verifyAsync<SessionClaims>(token, { clockTimestamp: Date.now() / 1000 })
+      .catch(() => undefined);
+    if (claims && isUUID(claims.sub) && isUUID(claims.sid, '4')) {
+      return claims;
+    }
   }
 }
