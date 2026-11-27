@@ -328,6 +328,36 @@ describe('account sessions (e2e)', () => {
     await privateResource('developer', secondCookie).expect(200);
   });
 
+  it('expires the cookie on logout retry after the first response is lost', async () => {
+    const cookie = sessionCookie(await login(developerEmail).expect(200));
+    await privateResource('developer', cookie).expect(200);
+
+    // Keep the original cookie to simulate a browser that missed Set-Cookie.
+    await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .expect(204);
+    await privateResource('developer', cookie).expect(401);
+
+    const retry = await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Origin', origin)
+      .set('Cookie', cookie)
+      .expect(204)
+      .expect('Cache-Control', 'no-store')
+      .expect('');
+    expect(sessionCookieHeader(retry).split('; ').sort()).toEqual([
+      'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+      'HttpOnly',
+      'Path=/',
+      'SameSite=Lax',
+      'Secure',
+      'radar_session=',
+    ]);
+    await privateResource('developer', cookie).expect(401);
+  });
+
   it('revokes both device sessions permanently when the account is deactivated', async () => {
     const { id } = await prisma.user.findUniqueOrThrow({
       where: { email: developerEmail },

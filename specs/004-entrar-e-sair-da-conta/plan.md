@@ -46,7 +46,7 @@
   - Teste primeiro — ao desativar uma conta com duas sessões, ambas perdem acesso. Depois da reativação, ambas continuam inválidas e um novo login funciona. Um teste de concorrência confirma que um login iniciado antes da desativação não deixa sessão válida após a transação. O cenário falha enquanto a transição de estado não revogar as sessões.
   - Arquivos previstos — operação interna de desativação, serviço de sessão e `apps/api/test/auth-session.e2e-spec.ts`.
 
-- [ ] **Tarefa 8 — Retomar após falha de rede**
+- [x] **Tarefa 8 — Retomar após falha de rede**
   - Cobre CA7.
   - Teste primeiro — simular falha de transporte durante login e logout. Em cada tela, o usuário vê a mensagem e consegue tentar novamente. No logout, simular a perda da resposta após a revogação e confirmar que a saída pode ser concluída na nova tentativa e que a API continua recusando o cookie antigo.
   - Arquivos previstos — tela de entrada, área privada, cliente de sessão e testes web, mais `apps/api/test/auth-session.e2e-spec.ts` para a repetição do logout.

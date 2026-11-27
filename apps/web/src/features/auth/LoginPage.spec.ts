@@ -120,6 +120,57 @@ it.each([
   }
 });
 
+it.each(["login", "session"])("allows login retry when the %s response is lost", async (failedRequest) => {
+  const profile = { id: "user-1", name: "Ana", role: "DEVELOPER" };
+  const email = "ana@example.com";
+  const password = "original password";
+  let failOnce = true;
+  const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+    if (failOnce && String(input).endsWith(`/auth/${failedRequest}`)) {
+      failOnce = false;
+      throw new TypeError("Network unavailable");
+    }
+    return new Response(JSON.stringify({ data: profile }), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  await router.push("/entrar");
+  const page = mount(App, { global: { plugins: [router] } });
+  const removeErrorHandler = router.onError(() => {});
+
+  try {
+    const emailInput = page.get<HTMLInputElement>('input[type="email"]');
+    const passwordInput = page.get<HTMLInputElement>('input[type="password"]');
+    await emailInput.setValue(email);
+    await passwordInput.setValue(password);
+    await page.get("form").trigger("submit");
+
+    await vi.waitFor(() => {
+      expect(page.get('[role="alert"]').text()).toBe("Não foi possível entrar na sua conta.");
+      expect(page.get('button[type="submit"]').attributes("disabled")).toBeUndefined();
+    });
+    expect(router.currentRoute.value.name).toBe("login");
+    expect(emailInput.element.value).toBe(email);
+    expect(passwordInput.element.value).toBe(password);
+
+    await page.get("form").trigger("submit");
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.name).toBe("private-area");
+      expect(page.get("h1").text()).toBe("Área do desenvolvedor");
+    });
+
+    const loginRequests = fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/auth/login"));
+    expect(loginRequests).toHaveLength(2);
+    expect(loginRequests[1]?.[1]).toMatchObject({
+      method: "POST",
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
+    });
+  } finally {
+    removeErrorHandler();
+    page.unmount();
+  }
+});
+
 it("returns to the login page when private navigation has no session", async () => {
   const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
     new Response(null, { status: 401 }),

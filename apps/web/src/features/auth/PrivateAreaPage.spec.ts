@@ -47,6 +47,65 @@ it("ends the current session and requires a new login to reopen the private area
   }
 });
 
+it.each([
+  { scenario: "the request never reaches the server", revokedOnFirstRequest: false },
+  { scenario: "the response is lost after revocation", revokedOnFirstRequest: true },
+])("allows logout retry when $scenario", async ({ revokedOnFirstRequest }) => {
+  let sessionActive = true;
+  let logoutRequests = 0;
+  const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+    if (String(input).endsWith("/auth/logout")) {
+      logoutRequests++;
+      if (logoutRequests === 1) {
+        sessionActive = !revokedOnFirstRequest;
+        throw new TypeError("Network unavailable");
+      }
+
+      sessionActive = false;
+      return new Response(null, { status: 204 });
+    }
+
+    return sessionActive ? validSession() : new Response(null, { status: 401 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await router.push("/entrar");
+  await router.push("/area-privada");
+  const page = mount(App, { global: { plugins: [router] } });
+  try {
+    await page.get("button").trigger("click");
+    await flushPromises();
+
+    expect(page.get('[role="alert"]').text()).toBe("Não foi possível sair da conta.");
+
+    window.dispatchEvent(new Event("focus"));
+    await flushPromises();
+
+    expect(router.currentRoute.value.name).toBe("private-area");
+    expect(page.get('[role="alert"]').text()).toBe("Não foi possível sair da conta.");
+    expect(page.text()).not.toContain("Olá, Ana.");
+    const retry = page.get("button");
+    expect(retry.text()).toBe("Tentar novamente");
+    expect(retry.attributes("disabled")).toBeUndefined();
+
+    await retry.trigger("click");
+    await flushPromises();
+
+    expect(logoutRequests).toBe(2);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringMatching(/\/auth\/logout$/),
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
+    expect(router.currentRoute.value.name).toBe("login");
+    expect(page.get("h1").text()).toBe("Entre no Radar Local");
+
+    await router.push("/area-privada");
+    expect(router.currentRoute.value.name).toBe("login");
+  } finally {
+    page.unmount();
+  }
+});
+
 it("requires a new login when the private area is reopened during logout", async () => {
   let completeLogout!: () => void;
   const logoutResponse = new Promise<void>((resolve) => {

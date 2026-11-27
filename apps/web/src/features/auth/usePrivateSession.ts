@@ -23,7 +23,7 @@ export function usePrivateSession(initialProfile: SessionProfile) {
     if (
       state.value.status === "checking" ||
       state.value.status === "signed-out" ||
-      logoutStatus.value === "pending"
+      logoutStatus.value !== "idle"
     ) {
       return;
     }
