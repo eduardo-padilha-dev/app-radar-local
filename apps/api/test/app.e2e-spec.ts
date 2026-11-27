@@ -80,6 +80,7 @@ describe('AppController (e2e)', () => {
       ['/auth/login', 'post', ['200', '400', '401', '403', '409', '500']],
       ['/auth/logout', 'post', ['204', '403', '500']],
       ['/auth/session', 'get', ['200', '401', '500']],
+      ['/admin/access', 'get', ['204', '401', '403', '500']],
       ['/auth/register', 'post', ['201', '400', '409', '500', '502']],
       ['/auth/verify-email', 'post', ['200', '400', '404', '410', '500']],
       ['/auth/resend-verification', 'post', ['202', '400', '500']],
@@ -89,9 +90,24 @@ describe('AppController (e2e)', () => {
       expect(operation.summary).toBeTruthy();
       expect(operation.tags).toHaveLength(1);
       expect(Object.keys(operation.responses)).toEqual(
-        expect.arrayContaining(statuses),
+        expect.arrayContaining([...statuses]),
       );
     }
+  });
+
+  it('documents administrative access with cookie authentication and no content', async () => {
+    const { body } = await request(app.getHttpServer())
+      .get('/docs-json')
+      .expect(200);
+    const operation = body.paths['/admin/access']?.get;
+
+    expect(operation?.security).toEqual([{ cookie: [] }]);
+    expect(body.components.securitySchemes.cookie).toMatchObject({
+      type: 'apiKey',
+      in: 'cookie',
+      name: 'radar_session',
+    });
+    expect(operation.responses['204'].content).toBeUndefined();
   });
 
   it('serves the live OpenAPI contract for the public registration endpoint', async () => {

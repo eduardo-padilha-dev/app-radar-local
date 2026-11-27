@@ -22,7 +22,7 @@ Complemento para revisão. [Spec de autorização](complemento-autorizacao.md).
   - Teste primeiro. Criar sessões em duas contas no PostgreSQL e chamar `GET /auth/sessions/:id` com um cookie de sessão válido. Esperar 200 com exatamente `id` e `expiresAt` no envelope `data` para a sessão própria ativa. Comparar as respostas 404 para ID inexistente, sessão expirada, revogada ou de outra conta. Repetir a tentativa de acesso a outra conta com um administrador. Cobrir 400 para UUID inválido e 401 sem sessão. A rota ainda não existe, então o caso de sucesso deve falhar primeiro.
   - Arquivos previstos: `apps/api/src/modules/auth/auth.controller.ts`, `apps/api/src/modules/auth/auth-session.service.ts` e `apps/api/test/auth-session.e2e-spec.ts`.
 
-- [ ] **Tarefa 3 — Demonstrar acesso administrativo**
+- [x] **Tarefa 3 — Demonstrar acesso administrativo**
   - Cobre CA11.
   - Teste primeiro. Fazer login com contas de teste dos dois papéis e usar os cookies emitidos em `GET /admin/access`. Esperar 204 sem corpo para administrador, 403 para desenvolvedor e 401 sem cookie válido. Verificar em `/docs-json` a autenticação por cookie e os três status documentados. A rota ainda não existe, então o caso administrativo deve falhar primeiro.
   - Arquivos previstos: `apps/api/src/modules/auth/admin-access.controller.ts`, `apps/api/src/modules/auth/auth.module.ts`, `apps/api/test/auth-session.e2e-spec.ts` e `apps/api/test/app.e2e-spec.ts`.

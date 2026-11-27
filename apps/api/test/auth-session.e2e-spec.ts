@@ -212,6 +212,33 @@ describe('account sessions (e2e)', () => {
     },
   );
 
+  it('grants administrative access without a response body', async () => {
+    const cookie = sessionCookie(await login(adminEmail).expect(200));
+
+    await request(app.getHttpServer())
+      .get('/admin/access')
+      .set('Cookie', cookie)
+      .expect(204)
+      .expect('');
+  });
+
+  it('forbids administrative access for a developer session', async () => {
+    const cookie = sessionCookie(await login(developerEmail).expect(200));
+
+    await request(app.getHttpServer())
+      .get('/admin/access')
+      .set('Cookie', cookie)
+      .expect(403);
+  });
+
+  it('requires a valid session cookie for administrative access', async () => {
+    await request(app.getHttpServer()).get('/admin/access').expect(401);
+    await request(app.getHttpServer())
+      .get('/admin/access')
+      .set('Cookie', 'radar_session=invalid')
+      .expect(401);
+  });
+
   function sessionDetails(id: string, cookie?: string) {
     const resource = request(app.getHttpServer()).get('/auth/sessions/' + id);
     if (cookie) resource.set('Cookie', cookie);
@@ -747,6 +774,11 @@ describe('account sessions (e2e)', () => {
     try {
       await privateResource('developer', cookie).expect(403);
       await privateResource('admin', cookie).expect(200);
+      await request(app.getHttpServer())
+        .get('/admin/access')
+        .set('Cookie', cookie)
+        .expect(204)
+        .expect('');
     } finally {
       await prisma.user.update({
         where: { email: developerEmail },
