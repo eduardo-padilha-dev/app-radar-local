@@ -252,6 +252,25 @@ A função é apenas de consulta; liberação do plano depende de confirmação 
 
 **Regras relacionadas:** RN12, RN13, RN15, RN16.
 
+### US11 — Gerenciar próprias sessões · `Must Have` · `M` · Status: `🟡 Ready`
+
+**Como** usuário cadastrado, **eu quero** consultar minhas sessões, revogar outra
+sessão ativa e remover minhas sessões encerradas **para que** eu possa controlar
+onde minha conta está conectada.
+
+**Critérios de aceite:**
+
+- [ ] **Dado** que entrei em dois dispositivos, **quando** consultar minhas sessões, **então** verei as duas, a situação de cada uma, seu prazo de validade e qual é a sessão atual.
+- [ ] **Dado** outra sessão ativa da minha conta, **quando** revogá-la, **então** ela perderá o acesso às funções privadas e minha sessão atual continuará válida.
+- [ ] **Dado** uma sessão própria revogada ou vencida, **quando** removê-la, **então** ela sairá da minha lista sem afetar minhas outras sessões.
+- [ ] **Dado** uma sessão própria ainda ativa, **quando** tentar removê-la, **então** a remoção será recusada e a sessão continuará válida.
+- [ ] **Dado** que a sessão pertence a outra conta, **quando** tentar consultá-la, revogá-la ou removê-la, **então** receberei a mesma resposta que receberia para uma sessão inexistente, independentemente do meu perfil.
+- [ ] **Dado** que perdi a conexão após pedir a revogação ou remoção, **quando** voltar com uma sessão válida, **então** poderei consultar a lista para conferir o resultado e repetir a operação com segurança.
+
+Para encerrar a sessão atual, o usuário usa a saída da conta da US03.
+
+**Regras relacionadas:** RN15, RN17.
+
 ## 🛡️ 5. Regras de Negócio (Constraints)
 
 | ID | Regra |
@@ -272,6 +291,7 @@ A função é apenas de consulta; liberação do plano depende de confirmação 
 | RN14 | Após o vencimento, permanece a consulta ao histórico e acompanhamentos; novas buscas e alterações exigem renovação. Sem plano válido, a demonstração permite somente sua busca e consulta aos resultados, sem salvar acompanhamentos nem alterar marcações. |
 | RN15 | Desativar uma conta impede seu acesso, preserva registros e mantém o vencimento original do plano, sem pausa ou extensão. Reativar não concede dias adicionais. |
 | RN16 | O administrador gerencia usuários e consulta pedidos, pagamentos e validade, sem acessar históricos de busca, acompanhamentos, status ou valores de projetos dos desenvolvedores. Esses dados são privados de cada desenvolvedor. |
+| RN17 | Uma conta pode ter várias sessões. A gestão é restrita às sessões da própria conta. O usuário pode revogar outra sessão ativa e só pode remover sessões próprias revogadas ou vencidas. |
 
 Um desenvolvedor pode possuir vários acompanhamentos e pedidos de contratação,
 comportando relações de um para muitos (1:N) exigidas pela disciplina. O modelo
